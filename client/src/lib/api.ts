@@ -55,3 +55,13 @@ export async function getStats(startDate?: string, endDate?: string): Promise<St
 export async function analyzeDocForMeeting(meetingId: string, googleDocId: string) {
   return apiRequest("POST", `/api/meetings/${meetingId}/analyze-doc`, { googleDocId });
 }
+
+export async function getCurrentChallenge() {
+  const response = await fetch('/api/challenge/current');
+  return response.json();
+}
+
+export async function getAchievements() {
+  const response = await fetch('/api/achievements');
+  return response.json();
+}

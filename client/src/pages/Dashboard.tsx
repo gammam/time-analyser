@@ -4,9 +4,11 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { DailyScoreCard } from "@/components/DailyScoreCard";
 import { MeetingList } from "@/components/MeetingList";
 import { TrendChart } from "@/components/TrendChart";
+import { WeeklyChallengeCard } from "@/components/WeeklyChallengeCard";
+import { AchievementsList } from "@/components/AchievementsList";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle } from "lucide-react";
-import { getMeetings, getStats, syncMeetings, type MeetingWithScore } from "@/lib/api";
+import { getMeetings, getStats, syncMeetings, getCurrentChallenge, getAchievements, type MeetingWithScore } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -42,11 +44,23 @@ export default function Dashboard() {
     queryFn: () => getStats(start.toISOString(), end.toISOString()),
   });
 
+  const { data: challenge } = useQuery({
+    queryKey: ['/api/challenge/current'],
+    queryFn: getCurrentChallenge,
+  });
+
+  const { data: achievements = [] } = useQuery({
+    queryKey: ['/api/achievements'],
+    queryFn: getAchievements,
+  });
+
   const syncMutation = useMutation({
     mutationFn: () => syncMeetings(start.toISOString(), end.toISOString()),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/challenge/current'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/achievements'] });
       toast({
         title: "Meetings synced",
         description: `Successfully synced ${data.count} meetings from Google Calendar`,
@@ -138,46 +152,44 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            <div className="grid gap-6 md:grid-cols-3">
-              <DailyScoreCard 
-                score={avgScore} 
-                trend={trend} 
-                meetingCount={meetings.length}
-                date={dateRange === "today" ? "Today's Score" : "Average Score"}
-              />
-              <DailyScoreCard 
-                score={yesterdayStats?.averageScore || 0} 
-                trend={0} 
-                meetingCount={yesterdayStats?.totalMeetings || 0}
-                date="Yesterday"
-              />
-              <DailyScoreCard 
-                score={meetings.length > 0 ? Math.max(...formattedMeetings.map(m => m.score)) : 0} 
-                trend={0} 
-                meetingCount={meetings.length}
-                date="Best Score"
-              />
+            <div className="grid gap-6 lg:grid-cols-4">
+              <div className="lg:col-span-3 grid gap-6 md:grid-cols-3">
+                <DailyScoreCard 
+                  score={avgScore} 
+                  trend={trend} 
+                  meetingCount={meetings.length}
+                  date={dateRange === "today" ? "Today's Score" : "Average Score"}
+                />
+                <DailyScoreCard 
+                  score={yesterdayStats?.averageScore || 0} 
+                  trend={0} 
+                  meetingCount={yesterdayStats?.totalMeetings || 0}
+                  date="Yesterday"
+                />
+                <DailyScoreCard 
+                  score={meetings.length > 0 ? Math.max(...formattedMeetings.map(m => m.score)) : 0} 
+                  trend={0} 
+                  meetingCount={meetings.length}
+                  date="Best Score"
+                />
+              </div>
+              {challenge && (
+                <div className="lg:row-span-2">
+                  <WeeklyChallengeCard challenge={challenge} />
+                </div>
+              )}
             </div>
 
-            {stats?.trendData && stats.trendData.length > 0 && (
-              <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2">
+            <div className="grid gap-6 lg:grid-cols-4">
+              <div className="lg:col-span-3">
+                {stats?.trendData && stats.trendData.length > 0 && (
                   <TrendChart data={stats.trendData} title={`${dateRange === "7days" ? "7-Day" : dateRange === "30days" ? "30-Day" : "Daily"} Score Trend`} />
-                </div>
-                <div className="flex flex-col gap-4">
-                  <div className="bg-card border border-card-border rounded-lg p-6">
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Total Meetings</h3>
-                    <div className="text-3xl font-bold font-mono" data-testid="text-total-meetings">{meetings.length}</div>
-                  </div>
-                  <div className="bg-card border border-card-border rounded-lg p-6">
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Average Score</h3>
-                    <div className="text-3xl font-bold font-mono text-primary" data-testid="text-avg-score">
-                      {avgScore}
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
-            )}
+              <div className="space-y-4">
+                <AchievementsList achievements={achievements} />
+              </div>
+            </div>
 
             <MeetingList 
               meetings={formattedMeetings} 

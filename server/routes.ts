@@ -6,12 +6,29 @@ import { getUncachableGoogleDocsClient } from "./google-docs";
 import { calculateMeetingScore, extractAgendaFromDescription, extractKeywordsFromNotes } from "./scoring";
 import { insertMeetingSchema, insertMeetingScoreSchema } from "@shared/schema";
 import { generateWeeklyChallenge, updateChallengeProgress } from "./gamification";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Sync meetings from Google Calendar
-  app.post("/api/meetings/sync", async (req, res) => {
+  // Setup authentication
+  // Reference: blueprint:javascript_log_in_with_replit
+  await setupAuth(app);
+
+  // Get authenticated user
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user"; // TODO: Replace with actual auth
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Sync meetings from Google Calendar
+  app.post("/api/meetings/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
       const { timeMin, timeMax } = req.body;
 
       const calendar = await getUncachableGoogleCalendarClient();
@@ -81,9 +98,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get meetings for a date range
-  app.get("/api/meetings", async (req, res) => {
+  app.get("/api/meetings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const { startDate, endDate } = req.query;
 
       const meetings = await storage.getMeetingsByUserId(
@@ -107,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Link a Google Doc to a meeting and analyze it
-  app.post("/api/meetings/:id/analyze-doc", async (req, res) => {
+  app.post("/api/meetings/:id/analyze-doc", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       
@@ -160,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get score statistics
-  app.get("/api/stats", async (req, res) => {
+  app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const { startDate, endDate } = req.query;
 
       const meetings = await storage.getMeetingsByUserId(
@@ -194,9 +211,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get current weekly challenge
-  app.get("/api/challenge/current", async (req, res) => {
+  app.get("/api/challenge/current", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       let challenge = await storage.getCurrentWeeklyChallenge(userId);
       
       if (!challenge) {
@@ -211,9 +228,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate new weekly challenge
-  app.post("/api/challenge/generate", async (req, res) => {
+  app.post("/api/challenge/generate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const challenge = await generateWeeklyChallenge(userId);
       res.json(challenge);
     } catch (error: any) {
@@ -223,9 +240,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get user achievements
-  app.get("/api/achievements", async (req, res) => {
+  app.get("/api/achievements", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = "demo-user";
+      const userId = req.user.claims.sub;
       const achievements = await storage.getUserAchievements(userId);
       res.json(achievements);
     } catch (error: any) {

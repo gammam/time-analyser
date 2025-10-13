@@ -1,11 +1,11 @@
-import { type User, type InsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement } from "@shared/schema";
+import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // User methods
+  // User methods - Required for Replit Auth
+  // Reference: blueprint:javascript_log_in_with_replit
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
   
   // Meeting methods
   getMeeting(id: string): Promise<Meeting | undefined>;
@@ -30,95 +30,97 @@ export interface IStorage {
   createAchievement(achievement: InsertAchievement): Promise<Achievement>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private meetings: Map<string, Meeting>;
-  private meetingScores: Map<string, MeetingScore>;
-  private weeklyChallenges: Map<string, WeeklyChallenge>;
-  private achievements: Map<string, Achievement>;
+// Import database and Drizzle ORM utilities
+// Reference: blueprint:javascript_database
+import { db } from "./db";
+import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable } from "@shared/schema";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
-  constructor() {
-    this.users = new Map();
-    this.meetings = new Map();
-    this.meetingScores = new Map();
-    this.weeklyChallenges = new Map();
-    this.achievements = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
+  // User methods - Required for Replit Auth
+  // Reference: blueprint:javascript_log_in_with_replit
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return user;
   }
 
   async getMeeting(id: string): Promise<Meeting | undefined> {
-    return this.meetings.get(id);
+    const [meeting] = await db.select().from(meetingsTable).where(eq(meetingsTable.id, id));
+    return meeting || undefined;
   }
 
   async getMeetingsByUserId(userId: string, startDate?: Date, endDate?: Date): Promise<Meeting[]> {
-    let meetings = Array.from(this.meetings.values()).filter(
-      (meeting) => meeting.userId === userId
-    );
+    const conditions = [eq(meetingsTable.userId, userId)];
     
     if (startDate) {
-      meetings = meetings.filter(m => new Date(m.startTime) >= startDate);
+      conditions.push(gte(meetingsTable.startTime, startDate));
     }
     
     if (endDate) {
-      meetings = meetings.filter(m => new Date(m.startTime) <= endDate);
+      conditions.push(lte(meetingsTable.startTime, endDate));
     }
     
-    return meetings.sort((a, b) => 
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-    );
+    return await db
+      .select()
+      .from(meetingsTable)
+      .where(and(...conditions))
+      .orderBy(meetingsTable.startTime);
   }
 
   async createMeeting(insertMeeting: InsertMeeting): Promise<Meeting> {
-    const meeting: Meeting = { 
-      ...insertMeeting,
-      description: insertMeeting.description ?? null,
-      participants: insertMeeting.participants ?? 0,
-      googleDocId: insertMeeting.googleDocId ?? null,
-      lastSynced: new Date() 
-    };
-    this.meetings.set(meeting.id, meeting);
+    const [meeting] = await db
+      .insert(meetingsTable)
+      .values({
+        ...insertMeeting,
+        description: insertMeeting.description ?? null,
+        participants: insertMeeting.participants ?? 0,
+        googleDocId: insertMeeting.googleDocId ?? null,
+        lastSynced: new Date()
+      })
+      .returning();
     return meeting;
   }
 
   async updateMeeting(id: string, updates: Partial<Meeting>): Promise<Meeting | undefined> {
-    const meeting = this.meetings.get(id);
-    if (!meeting) return undefined;
-    
-    const updated = { ...meeting, ...updates, lastSynced: new Date() };
-    this.meetings.set(id, updated);
-    return updated;
+    const [meeting] = await db
+      .update(meetingsTable)
+      .set({ ...updates, lastSynced: new Date() })
+      .where(eq(meetingsTable.id, id))
+      .returning();
+    return meeting || undefined;
   }
 
   async upsertMeeting(insertMeeting: InsertMeeting): Promise<Meeting> {
-    const existing = this.meetings.get(insertMeeting.id);
+    const existing = await this.getMeeting(insertMeeting.id);
     
     if (existing) {
       // Preserve enriched fields (googleDocId) if they were manually set
-      const updated: Meeting = {
-        ...existing,
-        ...insertMeeting,
-        description: insertMeeting.description ?? null,
-        participants: insertMeeting.participants ?? 0,
-        googleDocId: existing.googleDocId || insertMeeting.googleDocId || null,
-        lastSynced: new Date()
-      };
-      this.meetings.set(insertMeeting.id, updated);
+      const [updated] = await db
+        .update(meetingsTable)
+        .set({
+          ...insertMeeting,
+          description: insertMeeting.description ?? null,
+          participants: insertMeeting.participants ?? 0,
+          googleDocId: existing.googleDocId || insertMeeting.googleDocId || null,
+          lastSynced: new Date()
+        })
+        .where(eq(meetingsTable.id, insertMeeting.id))
+        .returning();
       return updated;
     } else {
       return this.createMeeting(insertMeeting);
@@ -126,52 +128,56 @@ export class MemStorage implements IStorage {
   }
 
   async getMeetingScore(meetingId: string): Promise<MeetingScore | undefined> {
-    return Array.from(this.meetingScores.values()).find(
-      (score) => score.meetingId === meetingId
-    );
+    const [score] = await db
+      .select()
+      .from(meetingScoresTable)
+      .where(eq(meetingScoresTable.meetingId, meetingId));
+    return score || undefined;
   }
 
   async createMeetingScore(insertScore: InsertMeetingScore): Promise<MeetingScore> {
-    const id = randomUUID();
-    const score: MeetingScore = { 
-      id,
-      meetingId: insertScore.meetingId,
-      agendaScore: insertScore.agendaScore ?? 0,
-      participantsScore: insertScore.participantsScore ?? 0,
-      timingScore: insertScore.timingScore ?? 0,
-      actionsScore: insertScore.actionsScore ?? 0,
-      attentionScore: insertScore.attentionScore ?? 0,
-      totalScore: insertScore.totalScore ?? 0,
-      calculatedAt: new Date()
-    };
-    this.meetingScores.set(id, score);
+    const [score] = await db
+      .insert(meetingScoresTable)
+      .values({
+        ...insertScore,
+        agendaScore: insertScore.agendaScore ?? 0,
+        participantsScore: insertScore.participantsScore ?? 0,
+        timingScore: insertScore.timingScore ?? 0,
+        actionsScore: insertScore.actionsScore ?? 0,
+        attentionScore: insertScore.attentionScore ?? 0,
+        totalScore: insertScore.totalScore ?? 0,
+        calculatedAt: new Date()
+      })
+      .returning();
     return score;
   }
 
   async updateMeetingScore(meetingId: string, updates: Partial<MeetingScore>): Promise<MeetingScore | undefined> {
-    const existingScore = await this.getMeetingScore(meetingId);
-    if (!existingScore) return undefined;
-    
-    const updated = { ...existingScore, ...updates, calculatedAt: new Date() };
-    this.meetingScores.set(existingScore.id, updated);
-    return updated;
+    const [score] = await db
+      .update(meetingScoresTable)
+      .set({ ...updates, calculatedAt: new Date() })
+      .where(eq(meetingScoresTable.meetingId, meetingId))
+      .returning();
+    return score || undefined;
   }
 
   async upsertMeetingScore(insertScore: InsertMeetingScore): Promise<MeetingScore> {
     const existing = await this.getMeetingScore(insertScore.meetingId);
     
     if (existing) {
-      const updated: MeetingScore = {
-        ...existing,
-        agendaScore: insertScore.agendaScore ?? existing.agendaScore,
-        participantsScore: insertScore.participantsScore ?? existing.participantsScore,
-        timingScore: insertScore.timingScore ?? existing.timingScore,
-        actionsScore: insertScore.actionsScore ?? existing.actionsScore,
-        attentionScore: insertScore.attentionScore ?? existing.attentionScore,
-        totalScore: insertScore.totalScore ?? existing.totalScore,
-        calculatedAt: new Date()
-      };
-      this.meetingScores.set(existing.id, updated);
+      const [updated] = await db
+        .update(meetingScoresTable)
+        .set({
+          agendaScore: insertScore.agendaScore ?? existing.agendaScore,
+          participantsScore: insertScore.participantsScore ?? existing.participantsScore,
+          timingScore: insertScore.timingScore ?? existing.timingScore,
+          actionsScore: insertScore.actionsScore ?? existing.actionsScore,
+          attentionScore: insertScore.attentionScore ?? existing.attentionScore,
+          totalScore: insertScore.totalScore ?? existing.totalScore,
+          calculatedAt: new Date()
+        })
+        .where(eq(meetingScoresTable.meetingId, insertScore.meetingId))
+        .returning();
       return updated;
     } else {
       return this.createMeetingScore(insertScore);
@@ -184,48 +190,57 @@ export class MemStorage implements IStorage {
     weekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     weekStart.setHours(0, 0, 0, 0);
     
-    return Array.from(this.weeklyChallenges.values()).find(
-      (challenge) => challenge.userId === userId && 
-                     challenge.weekStartDate.getTime() === weekStart.getTime()
-    );
+    const [challenge] = await db
+      .select()
+      .from(weeklyChallengesTable)
+      .where(
+        and(
+          eq(weeklyChallengesTable.userId, userId),
+          eq(weeklyChallengesTable.weekStartDate, weekStart)
+        )
+      );
+    return challenge || undefined;
   }
 
   async createWeeklyChallenge(insertChallenge: InsertWeeklyChallenge): Promise<WeeklyChallenge> {
-    const id = randomUUID();
-    const challenge: WeeklyChallenge = {
-      id,
-      ...insertChallenge,
-      createdAt: new Date()
-    };
-    this.weeklyChallenges.set(id, challenge);
+    const [challenge] = await db
+      .insert(weeklyChallengesTable)
+      .values({
+        ...insertChallenge,
+        createdAt: new Date()
+      })
+      .returning();
     return challenge;
   }
 
   async updateWeeklyChallenge(id: string, updates: Partial<WeeklyChallenge>): Promise<WeeklyChallenge | undefined> {
-    const challenge = this.weeklyChallenges.get(id);
-    if (!challenge) return undefined;
-    
-    const updated = { ...challenge, ...updates };
-    this.weeklyChallenges.set(id, updated);
-    return updated;
+    const [challenge] = await db
+      .update(weeklyChallengesTable)
+      .set(updates)
+      .where(eq(weeklyChallengesTable.id, id))
+      .returning();
+    return challenge || undefined;
   }
 
   async getUserAchievements(userId: string): Promise<Achievement[]> {
-    return Array.from(this.achievements.values())
-      .filter((achievement) => achievement.userId === userId)
-      .sort((a, b) => b.earnedAt.getTime() - a.earnedAt.getTime());
+    return await db
+      .select()
+      .from(achievementsTable)
+      .where(eq(achievementsTable.userId, userId))
+      .orderBy(desc(achievementsTable.earnedAt));
   }
 
   async createAchievement(insertAchievement: InsertAchievement): Promise<Achievement> {
-    const id = randomUUID();
-    const achievement: Achievement = {
-      id,
-      ...insertAchievement,
-      earnedAt: new Date()
-    };
-    this.achievements.set(id, achievement);
+    const [achievement] = await db
+      .insert(achievementsTable)
+      .values({
+        ...insertAchievement,
+        earnedAt: new Date()
+      })
+      .returning();
     return achievement;
   }
 }
 
-export const storage = new MemStorage();
+// Reference: blueprint:javascript_database
+export const storage = new DatabaseStorage();

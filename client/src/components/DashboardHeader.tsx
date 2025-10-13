@@ -1,4 +1,4 @@
-import { Calendar, Settings } from "lucide-react";
+import { Calendar, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import {
@@ -8,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface DashboardHeaderProps {
   onDateRangeChange?: (range: string) => void;
@@ -15,6 +17,8 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: DashboardHeaderProps) {
+  const { user } = useAuth();
+  
   return (
     <header className="border-b bg-background sticky top-0 z-50">
       <div className="flex items-center justify-between p-4 gap-4">
@@ -38,8 +42,24 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: Dash
             </SelectContent>
           </Select>
           
-          <Button variant="ghost" size="icon" data-testid="button-settings">
-            <Settings className="h-5 w-5" />
+          {user && (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.profileImageUrl} alt={user.email || "User"} />
+                <AvatarFallback>
+                  {user.firstName?.[0] || user.email?.[0] || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => window.location.href = '/api/logout'}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-5 w-5" />
           </Button>
           
           <ThemeToggle />

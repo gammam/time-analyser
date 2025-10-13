@@ -39,30 +39,46 @@ The backend follows a simple REST API architecture:
 
 ### Data Storage
 
-**Current Implementation**: In-memory storage using Maps for Users, Meetings, and Meeting Scores
+**Current Implementation**: PostgreSQL database via Drizzle ORM
 
 **Key Features**:
 - **Upsert Logic**: Meeting sync uses upsert operations to preserve manually enriched data (linked Google Docs) when re-syncing from Calendar
 - **Score Deduplication**: Meeting scores are upserted to prevent duplicate entries and maintain data consistency
 - **Input Validation**: All data validated using Zod schemas before storage operations
+- **Database Tables**: users, sessions, meetings, meetingScores, challenges, achievements
+- **Foreign Key Relationships**: meetings → users, meetingScores → meetings/users, challenges/achievements → users
 
-**Prepared for**: PostgreSQL via Drizzle ORM
+**Database Schema**:
 - Schema defined in `shared/schema.ts` using Drizzle's PostgreSQL table definitions
-- Includes users, meetings, and meetingScores tables with proper foreign key relationships
+- Includes users, meetings, meetingScores, challenges, and achievements tables with proper foreign key relationships
 - Zod schemas generated from Drizzle schemas for runtime validation
 - Migration support configured via `drizzle.config.ts`
 
-**Design Rationale**: The in-memory storage serves as a development placeholder. The database schema is already defined to support seamless transition to PostgreSQL when persistence is needed. Drizzle ORM was chosen for type safety and developer experience.
+**Design Rationale**: PostgreSQL provides ACID compliance and relational integrity needed for user data and meeting analytics. Drizzle ORM was chosen for type safety and developer experience.
 
 ### Authentication and Authorization
 
-**Current State**: Placeholder authentication using a hardcoded "demo-user" ID
+**Current Implementation**: Replit Auth with OpenID Connect (OIDC)
 
-**Prepared for**: Session-based authentication
-- `connect-pg-simple` package included for PostgreSQL session storage
-- User schema includes username and password fields
+**Authentication Flow**:
+- OAuth 2.0 via Replit Connectors supporting Google, GitHub, X (Twitter), Apple, and email/password login
+- Session-based authentication with PostgreSQL-backed session storage using `connect-pg-simple`
+- Token refresh handling for long-lived sessions (1 week TTL)
+- Protected API routes with `isAuthenticated` middleware that returns 401 for unauthorized requests
 
-**Design Rationale**: Authentication is intentionally simplified for initial development but the foundation is in place for proper user management.
+**Frontend Integration**:
+- `useAuth` hook provides authentication state and user data
+- Landing page shown to unauthenticated users with "Get Started" button
+- Dashboard accessible only to authenticated users
+- Logout functionality redirects to Replit's end session endpoint
+
+**Security Features**:
+- HTTP-only cookies prevent XSS attacks
+- Secure cookies in production (HTTPS required)
+- SameSite "lax" protection against CSRF
+- Environment-aware cookie settings for development
+
+**Design Rationale**: Replit Auth provides secure, managed authentication without requiring custom user/password management. Session-based approach with PostgreSQL storage ensures scalability and proper session lifecycle management.
 
 ### Scoring Algorithm
 
@@ -135,6 +151,12 @@ The meeting effectiveness score (0-100) is calculated from five weighted compone
 - ✅ Frontend dashboard with trend visualization and score breakdown
 - ✅ Manual Google Doc linking capability for enriching meeting scores
 - ✅ Gamification system with weekly challenges and achievements
+- ✅ **Authentication system with Replit Auth** (OpenID Connect)
+  - Multi-provider OAuth support (Google, GitHub, X, Apple, email/password)
+  - PostgreSQL session storage with 1-week TTL
+  - Protected API routes with authentication middleware
+  - Landing page for logged-out users
+  - User profile with logout functionality
 
 ### Gamification System
 - **Weekly Challenges**: Automatically generated based on user's weakest scoring criteria (agenda, participants, timing, actions, or attention)

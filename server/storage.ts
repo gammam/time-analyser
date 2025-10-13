@@ -12,11 +12,13 @@ export interface IStorage {
   getMeetingsByUserId(userId: string, startDate?: Date, endDate?: Date): Promise<Meeting[]>;
   createMeeting(meeting: InsertMeeting): Promise<Meeting>;
   updateMeeting(id: string, meeting: Partial<Meeting>): Promise<Meeting | undefined>;
+  upsertMeeting(meeting: InsertMeeting): Promise<Meeting>;
   
   // Meeting score methods
   getMeetingScore(meetingId: string): Promise<MeetingScore | undefined>;
   createMeetingScore(score: InsertMeetingScore): Promise<MeetingScore>;
   updateMeetingScore(meetingId: string, score: Partial<MeetingScore>): Promise<MeetingScore | undefined>;
+  upsertMeetingScore(score: InsertMeetingScore): Promise<MeetingScore>;
 }
 
 export class MemStorage implements IStorage {
@@ -90,6 +92,26 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async upsertMeeting(insertMeeting: InsertMeeting): Promise<Meeting> {
+    const existing = this.meetings.get(insertMeeting.id);
+    
+    if (existing) {
+      // Preserve enriched fields (googleDocId) if they were manually set
+      const updated: Meeting = {
+        ...existing,
+        ...insertMeeting,
+        description: insertMeeting.description ?? null,
+        participants: insertMeeting.participants ?? 0,
+        googleDocId: existing.googleDocId || insertMeeting.googleDocId || null,
+        lastSynced: new Date()
+      };
+      this.meetings.set(insertMeeting.id, updated);
+      return updated;
+    } else {
+      return this.createMeeting(insertMeeting);
+    }
+  }
+
   async getMeetingScore(meetingId: string): Promise<MeetingScore | undefined> {
     return Array.from(this.meetingScores.values()).find(
       (score) => score.meetingId === meetingId
@@ -120,6 +142,27 @@ export class MemStorage implements IStorage {
     const updated = { ...existingScore, ...updates, calculatedAt: new Date() };
     this.meetingScores.set(existingScore.id, updated);
     return updated;
+  }
+
+  async upsertMeetingScore(insertScore: InsertMeetingScore): Promise<MeetingScore> {
+    const existing = await this.getMeetingScore(insertScore.meetingId);
+    
+    if (existing) {
+      const updated: MeetingScore = {
+        ...existing,
+        agendaScore: insertScore.agendaScore ?? existing.agendaScore,
+        participantsScore: insertScore.participantsScore ?? existing.participantsScore,
+        timingScore: insertScore.timingScore ?? existing.timingScore,
+        actionsScore: insertScore.actionsScore ?? existing.actionsScore,
+        attentionScore: insertScore.attentionScore ?? existing.attentionScore,
+        totalScore: insertScore.totalScore ?? existing.totalScore,
+        calculatedAt: new Date()
+      };
+      this.meetingScores.set(existing.id, updated);
+      return updated;
+    } else {
+      return this.createMeetingScore(insertScore);
+    }
   }
 }
 

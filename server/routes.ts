@@ -31,7 +31,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const attendees = event.attendees || [];
-        const meeting = await storage.createMeeting({
+        
+        // Validate meeting data before upserting
+        const meetingData = insertMeetingSchema.parse({
           id: event.id,
           userId,
           googleEventId: event.id,
@@ -42,6 +44,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           participants: attendees.length,
           googleDocId: extractGoogleDocId(event.description),
         });
+        
+        const meeting = await storage.upsertMeeting(meetingData);
 
         // Calculate initial score
         const agenda = extractAgendaFromDescription(event.description || null);
@@ -56,7 +60,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           attentionPointsCount: 0,
         });
 
-        await storage.createMeetingScore({
+        // Upsert score to prevent duplicates
+        await storage.upsertMeetingScore({
           meetingId: meeting.id,
           ...score,
         });
@@ -101,6 +106,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/meetings/:id/analyze-doc", async (req, res) => {
     try {
       const { id } = req.params;
+      
+      // Validate input
+      if (!req.body.googleDocId || typeof req.body.googleDocId !== 'string') {
+        return res.status(400).json({ error: 'Valid googleDocId is required' });
+      }
+      
       const { googleDocId } = req.body;
 
       const meeting = await storage.getMeeting(id);
@@ -131,12 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         attentionPointsCount: attentionPoints,
       });
 
-      const existingScore = await storage.getMeetingScore(id);
-      if (existingScore) {
-        await storage.updateMeetingScore(id, score);
-      } else {
-        await storage.createMeetingScore({ meetingId: id, ...score });
-      }
+      // Upsert to prevent duplicate scores
+      await storage.upsertMeetingScore({ meetingId: id, ...score });
 
       res.json({ success: true, score, content: content.substring(0, 500) });
     } catch (error: any) {

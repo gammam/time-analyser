@@ -45,6 +45,7 @@ export const weeklyChallenges = pgTable("weekly_challenges", {
   meetingsCompleted: integer("meetings_completed").notNull().default(0),
   totalMeetings: integer("total_meetings").notNull().default(0),
   status: text("status").notNull().default('active'), // 'active', 'completed', 'failed'
+  countedMeetingIds: text("counted_meeting_ids").array().notNull().default(sql`ARRAY[]::text[]`), // Track which meetings have been counted
   createdAt: timestamp("created_at").default(sql`now()`),
 });
 

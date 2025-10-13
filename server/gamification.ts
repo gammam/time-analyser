@@ -73,6 +73,7 @@ export async function generateWeeklyChallenge(userId: string): Promise<any> {
     meetingsCompleted: 0,
     totalMeetings: 0,
     status: 'active',
+    countedMeetingIds: [],
   };
 
   return storage.createWeeklyChallenge(challenge);
@@ -125,6 +126,7 @@ function createDefaultChallenge(userId: string) {
     meetingsCompleted: 0,
     totalMeetings: 0,
     status: 'active',
+    countedMeetingIds: [],
   };
 
   return storage.createWeeklyChallenge(challenge);
@@ -133,6 +135,12 @@ function createDefaultChallenge(userId: string) {
 export async function updateChallengeProgress(userId: string, meetingId: string) {
   const challenge = await storage.getCurrentWeeklyChallenge(userId);
   if (!challenge || challenge.status !== 'active') return;
+
+  // Check if this meeting has already been counted
+  const countedIds = challenge.countedMeetingIds || [];
+  if (countedIds.includes(meetingId)) {
+    return; // Skip if already counted
+  }
 
   const score = await storage.getMeetingScore(meetingId);
   if (!score) return;
@@ -149,6 +157,7 @@ export async function updateChallengeProgress(userId: string, meetingId: string)
     totalMeetings,
     meetingsCompleted,
     currentProgress,
+    countedMeetingIds: [...countedIds, meetingId],
   });
 
   // Check if challenge is completed

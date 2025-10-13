@@ -5,6 +5,7 @@ import { getUncachableGoogleCalendarClient } from "./google-calendar";
 import { getUncachableGoogleDocsClient } from "./google-docs";
 import { calculateMeetingScore, extractAgendaFromDescription, extractKeywordsFromNotes } from "./scoring";
 import { insertMeetingSchema, insertMeetingScoreSchema } from "@shared/schema";
+import { generateWeeklyChallenge, updateChallengeProgress } from "./gamification";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Sync meetings from Google Calendar
@@ -65,6 +66,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meetingId: meeting.id,
           ...score,
         });
+
+        // Update challenge progress
+        await updateChallengeProgress(userId, meeting.id);
 
         meetings.push(meeting);
       }
@@ -145,6 +149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Upsert to prevent duplicate scores
       await storage.upsertMeetingScore({ meetingId: id, ...score });
 
+      // Update challenge progress
+      await updateChallengeProgress(meeting.userId, id);
+
       res.json({ success: true, score, content: content.substring(0, 500) });
     } catch (error: any) {
       console.error('Error analyzing doc:', error);
@@ -183,6 +190,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error fetching stats:', error);
       res.status(500).json({ error: error.message || 'Failed to fetch statistics' });
+    }
+  });
+
+  // Get current weekly challenge
+  app.get("/api/challenge/current", async (req, res) => {
+    try {
+      const userId = "demo-user";
+      let challenge = await storage.getCurrentWeeklyChallenge(userId);
+      
+      if (!challenge) {
+        challenge = await generateWeeklyChallenge(userId);
+      }
+      
+      res.json(challenge);
+    } catch (error: any) {
+      console.error('Error fetching challenge:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch challenge' });
+    }
+  });
+
+  // Generate new weekly challenge
+  app.post("/api/challenge/generate", async (req, res) => {
+    try {
+      const userId = "demo-user";
+      const challenge = await generateWeeklyChallenge(userId);
+      res.json(challenge);
+    } catch (error: any) {
+      console.error('Error generating challenge:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate challenge' });
+    }
+  });
+
+  // Get user achievements
+  app.get("/api/achievements", async (req, res) => {
+    try {
+      const userId = "demo-user";
+      const achievements = await storage.getUserAchievements(userId);
+      res.json(achievements);
+    } catch (error: any) {
+      console.error('Error fetching achievements:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch achievements' });
     }
   });
 

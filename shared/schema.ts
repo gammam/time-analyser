@@ -34,6 +34,30 @@ export const meetingScores = pgTable("meeting_scores", {
   calculatedAt: timestamp("calculated_at").default(sql`now()`),
 });
 
+export const weeklyChallenges = pgTable("weekly_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  weekStartDate: timestamp("week_start_date").notNull(),
+  targetCriteria: text("target_criteria").notNull(), // 'agenda', 'participants', 'timing', 'actions', 'attention'
+  goalDescription: text("goal_description").notNull(),
+  targetPercentage: integer("target_percentage").notNull().default(80),
+  currentProgress: integer("current_progress").notNull().default(0),
+  meetingsCompleted: integer("meetings_completed").notNull().default(0),
+  totalMeetings: integer("total_meetings").notNull().default(0),
+  status: text("status").notNull().default('active'), // 'active', 'completed', 'failed'
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(), // 'challenge_complete', 'streak', 'perfect_week', 'score_milestone'
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  iconName: text("icon_name").notNull(),
+  earnedAt: timestamp("earned_at").default(sql`now()`),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -48,9 +72,23 @@ export const insertMeetingScoreSchema = createInsertSchema(meetingScores).omit({
   calculatedAt: true,
 });
 
+export const insertWeeklyChallengeSchema = createInsertSchema(weeklyChallenges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAchievementSchema = createInsertSchema(achievements).omit({
+  id: true,
+  earnedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
 export type InsertMeeting = z.infer<typeof insertMeetingSchema>;
 export type MeetingScore = typeof meetingScores.$inferSelect;
 export type InsertMeetingScore = z.infer<typeof insertMeetingScoreSchema>;
+export type WeeklyChallenge = typeof weeklyChallenges.$inferSelect;
+export type InsertWeeklyChallenge = z.infer<typeof insertWeeklyChallengeSchema>;
+export type Achievement = typeof achievements.$inferSelect;
+export type InsertAchievement = z.infer<typeof insertAchievementSchema>;

@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore } from "@shared/schema";
+import { type User, type InsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -19,17 +19,30 @@ export interface IStorage {
   createMeetingScore(score: InsertMeetingScore): Promise<MeetingScore>;
   updateMeetingScore(meetingId: string, score: Partial<MeetingScore>): Promise<MeetingScore | undefined>;
   upsertMeetingScore(score: InsertMeetingScore): Promise<MeetingScore>;
+  
+  // Weekly challenge methods
+  getCurrentWeeklyChallenge(userId: string): Promise<WeeklyChallenge | undefined>;
+  createWeeklyChallenge(challenge: InsertWeeklyChallenge): Promise<WeeklyChallenge>;
+  updateWeeklyChallenge(id: string, challenge: Partial<WeeklyChallenge>): Promise<WeeklyChallenge | undefined>;
+  
+  // Achievement methods
+  getUserAchievements(userId: string): Promise<Achievement[]>;
+  createAchievement(achievement: InsertAchievement): Promise<Achievement>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private meetings: Map<string, Meeting>;
   private meetingScores: Map<string, MeetingScore>;
+  private weeklyChallenges: Map<string, WeeklyChallenge>;
+  private achievements: Map<string, Achievement>;
 
   constructor() {
     this.users = new Map();
     this.meetings = new Map();
     this.meetingScores = new Map();
+    this.weeklyChallenges = new Map();
+    this.achievements = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -163,6 +176,55 @@ export class MemStorage implements IStorage {
     } else {
       return this.createMeetingScore(insertScore);
     }
+  }
+
+  async getCurrentWeeklyChallenge(userId: string): Promise<WeeklyChallenge | undefined> {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    weekStart.setHours(0, 0, 0, 0);
+    
+    return Array.from(this.weeklyChallenges.values()).find(
+      (challenge) => challenge.userId === userId && 
+                     challenge.weekStartDate.getTime() === weekStart.getTime()
+    );
+  }
+
+  async createWeeklyChallenge(insertChallenge: InsertWeeklyChallenge): Promise<WeeklyChallenge> {
+    const id = randomUUID();
+    const challenge: WeeklyChallenge = {
+      id,
+      ...insertChallenge,
+      createdAt: new Date()
+    };
+    this.weeklyChallenges.set(id, challenge);
+    return challenge;
+  }
+
+  async updateWeeklyChallenge(id: string, updates: Partial<WeeklyChallenge>): Promise<WeeklyChallenge | undefined> {
+    const challenge = this.weeklyChallenges.get(id);
+    if (!challenge) return undefined;
+    
+    const updated = { ...challenge, ...updates };
+    this.weeklyChallenges.set(id, updated);
+    return updated;
+  }
+
+  async getUserAchievements(userId: string): Promise<Achievement[]> {
+    return Array.from(this.achievements.values())
+      .filter((achievement) => achievement.userId === userId)
+      .sort((a, b) => b.earnedAt.getTime() - a.earnedAt.getTime());
+  }
+
+  async createAchievement(insertAchievement: InsertAchievement): Promise<Achievement> {
+    const id = randomUUID();
+    const achievement: Achievement = {
+      id,
+      ...insertAchievement,
+      earnedAt: new Date()
+    };
+    this.achievements.set(id, achievement);
+    return achievement;
   }
 }
 

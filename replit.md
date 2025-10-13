@@ -134,12 +134,22 @@ The meeting effectiveness score (0-100) is calculated from five weighted compone
 - ✅ Meeting scoring algorithm implementation (5 criteria, 100 points total)
 - ✅ Frontend dashboard with trend visualization and score breakdown
 - ✅ Manual Google Doc linking capability for enriching meeting scores
+- ✅ Gamification system with weekly challenges and achievements
+
+### Gamification System
+- **Weekly Challenges**: Automatically generated based on user's weakest scoring criteria (agenda, participants, timing, actions, or attention)
+- **Challenge Progress**: Real-time tracking of meeting quality improvements with progress bars
+- **Anti-Double-Counting**: Robust mechanism using `countedMeetingIds` array to prevent inflated progress on meeting re-syncs
+- **Achievement System**: Unlock badges for completing challenges, with streak tracking and level progression
+- **UI Components**: `WeeklyChallengeCard` displays current challenge with visual progress; `AchievementsList` shows earned badges
+- **Challenge Logic**: Targets 80% success rate across at least 5 meetings; criteria score must be ≥15/20 (75%) to count as "passed"
 
 ### Bug Fixes and Improvements
 - Fixed API client to use correct parameter order (method, url, data) for POST requests
 - Implemented upsert logic to preserve enriched meeting data during re-sync
 - Added score deduplication to prevent duplicate score records
 - Added comprehensive input validation using Zod schemas
+- Fixed challenge progress double-counting by tracking which meetings have already contributed to current challenge
 - Verified end-to-end workflow from sync to scoring to display
 
 ### Testing
@@ -150,3 +160,5 @@ The meeting effectiveness score (0-100) is calculated from five weighted compone
   - Manual Google Doc linking dialog
   - Date range filtering (Today, 7 Days, 30 Days)
   - Trend chart visualization
+  - Weekly challenge generation and progress tracking
+  - Achievement unlocking system

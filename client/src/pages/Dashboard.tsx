@@ -61,9 +61,10 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/challenge/current'] });
       queryClient.invalidateQueries({ queryKey: ['/api/achievements'] });
+      const count = data?.count ?? data?.meetings?.length ?? 'your';
       toast({
         title: "Meetings synced",
-        description: `Successfully synced ${data.count} meetings from Google Calendar`,
+        description: `Successfully synced ${count} meetings from Google Calendar`,
       });
     },
     onError: (error: any) => {

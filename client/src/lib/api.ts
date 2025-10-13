@@ -29,10 +29,7 @@ export interface Stats {
 }
 
 export async function syncMeetings(timeMin?: string, timeMax?: string) {
-  return apiRequest("/api/meetings/sync", {
-    method: "POST",
-    body: JSON.stringify({ timeMin, timeMax }),
-  });
+  return apiRequest("POST", "/api/meetings/sync", { timeMin, timeMax });
 }
 
 export async function getMeetings(startDate?: string, endDate?: string): Promise<MeetingWithScore[]> {
@@ -56,8 +53,5 @@ export async function getStats(startDate?: string, endDate?: string): Promise<St
 }
 
 export async function analyzeDocForMeeting(meetingId: string, googleDocId: string) {
-  return apiRequest(`/api/meetings/${meetingId}/analyze-doc`, {
-    method: "POST",
-    body: JSON.stringify({ googleDocId }),
-  });
+  return apiRequest("POST", `/api/meetings/${meetingId}/analyze-doc`, { googleDocId });
 }

@@ -146,6 +146,12 @@ export function predictWeeklyCompletion(
     return 0;
   });
 
+  // Track remaining hours per day (mutable copy)
+  const dailyRemainingHours = dailyCapacities.map(dc => ({
+    date: dc.date,
+    remainingHours: dc.availableHours
+  }));
+  
   let remainingWeeklyHours = totalWeeklyHours;
   
   for (const task of sortedTasks) {
@@ -174,13 +180,18 @@ export function predictWeeklyCompletion(
       
       remainingWeeklyHours -= taskHours;
       
-      // Estimate completion date
-      let hoursAllocated = 0;
-      for (const dc of dailyCapacities) {
-        hoursAllocated += dc.availableHours;
-        if (hoursAllocated >= taskHours) {
-          estimatedCompletionDate = new Date(dc.date);
-          break;
+      // Estimate completion date by consuming daily capacity
+      let hoursNeeded = taskHours;
+      for (const dayCapacity of dailyRemainingHours) {
+        if (dayCapacity.remainingHours > 0) {
+          const hoursUsed = Math.min(hoursNeeded, dayCapacity.remainingHours);
+          dayCapacity.remainingHours -= hoursUsed;
+          hoursNeeded -= hoursUsed;
+          
+          if (hoursNeeded <= 0) {
+            estimatedCompletionDate = new Date(dayCapacity.date);
+            break;
+          }
         }
       }
     } else {

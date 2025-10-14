@@ -77,6 +77,49 @@ export const achievements = pgTable("achievements", {
   earnedAt: timestamp("earned_at").default(sql`now()`),
 });
 
+export const jiraTasks = pgTable("jira_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  jiraKey: text("jira_key").notNull(), // e.g., "PROJ-123"
+  jiraId: text("jira_id").notNull(), // Jira internal ID
+  summary: text("summary").notNull(),
+  description: text("description"),
+  status: text("status").notNull(), // e.g., "To Do", "In Progress", "Done"
+  priority: text("priority"), // e.g., "High", "Medium", "Low"
+  estimateHours: real("estimate_hours"), // Time estimate in hours
+  storyPoints: integer("story_points"), // Story points if used
+  dueDate: timestamp("due_date"),
+  assignee: text("assignee"),
+  projectKey: text("project_key"),
+  labels: text("labels").array().default(sql`ARRAY[]::text[]`),
+  lastSynced: timestamp("last_synced").default(sql`now()`),
+});
+
+export const dailyCapacity = pgTable("daily_capacity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  date: timestamp("date").notNull(),
+  totalHours: real("total_hours").notNull().default(8), // Standard work day
+  meetingHours: real("meeting_hours").notNull().default(0),
+  contextSwitchingMinutes: integer("context_switching_minutes").notNull().default(0),
+  availableHours: real("available_hours").notNull().default(8),
+  tasksCount: integer("tasks_count").notNull().default(0),
+  completableTasksCount: integer("completable_tasks_count").notNull().default(0),
+  calculatedAt: timestamp("calculated_at").default(sql`now()`),
+});
+
+export const taskCompletionPredictions = pgTable("task_completion_predictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => jiraTasks.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  weekStartDate: timestamp("week_start_date").notNull(),
+  completionProbability: integer("completion_probability").notNull(), // 0-100
+  riskLevel: text("risk_level").notNull(), // 'low', 'medium', 'high'
+  estimatedCompletionDate: timestamp("estimated_completion_date"),
+  blockers: text("blockers").array().default(sql`ARRAY[]::text[]`),
+  calculatedAt: timestamp("calculated_at").default(sql`now()`),
+});
+
 // Upsert schema for Replit Auth
 // Reference: blueprint:javascript_log_in_with_replit
 export const upsertUserSchema = createInsertSchema(users).omit({
@@ -103,6 +146,21 @@ export const insertAchievementSchema = createInsertSchema(achievements).omit({
   earnedAt: true,
 });
 
+export const insertJiraTaskSchema = createInsertSchema(jiraTasks).omit({
+  id: true,
+  lastSynced: true,
+});
+
+export const insertDailyCapacitySchema = createInsertSchema(dailyCapacity).omit({
+  id: true,
+  calculatedAt: true,
+});
+
+export const insertTaskCompletionPredictionSchema = createInsertSchema(taskCompletionPredictions).omit({
+  id: true,
+  calculatedAt: true,
+});
+
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
@@ -113,3 +171,9 @@ export type WeeklyChallenge = typeof weeklyChallenges.$inferSelect;
 export type InsertWeeklyChallenge = z.infer<typeof insertWeeklyChallengeSchema>;
 export type Achievement = typeof achievements.$inferSelect;
 export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
+export type JiraTask = typeof jiraTasks.$inferSelect;
+export type InsertJiraTask = z.infer<typeof insertJiraTaskSchema>;
+export type DailyCapacity = typeof dailyCapacity.$inferSelect;
+export type InsertDailyCapacity = z.infer<typeof insertDailyCapacitySchema>;
+export type TaskCompletionPrediction = typeof taskCompletionPredictions.$inferSelect;
+export type InsertTaskCompletionPrediction = z.infer<typeof insertTaskCompletionPredictionSchema>;

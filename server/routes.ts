@@ -268,13 +268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getUncachableJiraClient } = await import('./jira-client');
       const jira = await getUncachableJiraClient();
       
-      // Get current user info to find assigned issues
-      const myself = await jira.myself.getCurrentUser();
-      
-      // Search for issues assigned to current user that are not done
+      // Search for recent issues (not filtering by user since system account doesn't have "myself")
+      // This will sync all accessible tasks from the JIRA instance
       const searchResults = await jira.issueSearch.searchForIssuesUsingJql({
-        jql: `assignee = currentUser() AND status != Done ORDER BY dueDate ASC`,
-        maxResults: 100,
+        jql: `status != Done ORDER BY updated DESC`,
+        maxResults: 50, // Limit to recent 50 tasks
         fields: ['summary', 'description', 'status', 'priority', 'duedate', 'assignee', 'project', 'labels', 'timeestimate', 'customfield_10016'] // customfield_10016 is usually story points
       });
       
@@ -301,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           estimateHours,
           storyPoints,
           dueDate: fields.duedate ? new Date(fields.duedate) : null,
-          assignee: fields.assignee?.displayName || myself.displayName || '',
+          assignee: fields.assignee?.displayName || 'Unassigned',
           projectKey: fields.project?.key || '',
           labels: fields.labels || []
         };

@@ -158,8 +158,8 @@ export function extractAgendaFromDescription(description: string | null): {
   );
   
   const lines = description.split('\n').filter(line => line.trim().length > 0);
-  const hasBullets = /^[\s]*[-•*]\s/.test(description);
-  const hasNumbering = /^[\s]*\d+[\.)]\s/.test(description);
+  const hasBullets = /^[\s]*[-•*]\s/m.test(description);
+  const hasNumbering = /^[\s]*\d+[\.)]\s/m.test(description);
   
   const hasAgenda = hasKeyword || hasBullets || hasNumbering || lines.length >= 3;
   
@@ -188,7 +188,16 @@ export function extractKeywordsFromNotes(notes: string): {
   const accountabilityKeywords = ['assigned to', 'owner', 'responsible', 'accountability', 'dri', 'who will'];
   
   // Deadline keywords (The 12 Week Year principle)
-  const deadlineKeywords = ['by', 'deadline', 'due date', 'before', 'until', 'by end of'];
+  // Using word boundaries for accurate detection
+  const deadlinePatterns = [
+    /\bby\b/i,                    // "by" as a standalone word (not in "maybe")
+    /\bdeadline\b/i,
+    /\bdue\s+date\b/i,
+    /\bbefore\b/i,
+    /\buntil\b/i,
+    /\bby\s+end\s+of\b/i,
+    /\btarget\s+date\b/i
+  ];
   const datePatterns = [
     /\d{1,2}\/\d{1,2}\/\d{2,4}/,  // MM/DD/YYYY
     /\d{4}-\d{2}-\d{2}/,          // YYYY-MM-DD
@@ -213,9 +222,9 @@ export function extractKeywordsFromNotes(notes: string): {
     lowerNotes.includes(keyword)
   );
   
-  // Check for deadlines
-  const hasDeadlineKeyword = deadlineKeywords.some(keyword => 
-    lowerNotes.includes(keyword)
+  // Check for deadlines using word boundaries
+  const hasDeadlineKeyword = deadlinePatterns.some(pattern => 
+    pattern.test(notes)
   );
   const hasDatePattern = datePatterns.some(pattern => pattern.test(notes));
   const hasDeadlines = hasDeadlineKeyword || hasDatePattern;

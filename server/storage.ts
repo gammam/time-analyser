@@ -1,4 +1,4 @@
-import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement } from "@shared/schema";
+import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement, type JiraTask, type InsertJiraTask, type DailyCapacity, type InsertDailyCapacity, type TaskCompletionPrediction, type InsertTaskCompletionPrediction } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -28,12 +28,27 @@ export interface IStorage {
   // Achievement methods
   getUserAchievements(userId: string): Promise<Achievement[]>;
   createAchievement(achievement: InsertAchievement): Promise<Achievement>;
+  
+  // JIRA task methods
+  getJiraTasksByUserId(userId: string, status?: string): Promise<JiraTask[]>;
+  upsertJiraTask(task: InsertJiraTask): Promise<JiraTask>;
+  deleteJiraTasksByUserId(userId: string): Promise<void>;
+  
+  // Daily capacity methods
+  getDailyCapacity(userId: string, date: Date): Promise<DailyCapacity | undefined>;
+  getDailyCapacitiesForWeek(userId: string, weekStart: Date): Promise<DailyCapacity[]>;
+  upsertDailyCapacity(capacity: InsertDailyCapacity): Promise<DailyCapacity>;
+  
+  // Task completion prediction methods
+  getTaskPredictions(userId: string, weekStart: Date): Promise<TaskCompletionPrediction[]>;
+  upsertTaskPrediction(prediction: InsertTaskCompletionPrediction): Promise<TaskCompletionPrediction>;
+  deleteTaskPredictionsByWeek(userId: string, weekStart: Date): Promise<void>;
 }
 
 // Import database and Drizzle ORM utilities
 // Reference: blueprint:javascript_database
 import { db } from "./db";
-import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable } from "@shared/schema";
+import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable, jiraTasks as jiraTasksTable, dailyCapacity as dailyCapacityTable, taskCompletionPredictions as taskCompletionPredictionsTable } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export class DatabaseStorage implements IStorage {
@@ -239,6 +254,145 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return achievement;
+  }
+
+  async getJiraTasksByUserId(userId: string, status?: string): Promise<JiraTask[]> {
+    const conditions = [eq(jiraTasksTable.userId, userId)];
+    
+    if (status) {
+      conditions.push(eq(jiraTasksTable.status, status));
+    }
+    
+    return await db
+      .select()
+      .from(jiraTasksTable)
+      .where(and(...conditions))
+      .orderBy(desc(jiraTasksTable.dueDate));
+  }
+
+  async upsertJiraTask(insertTask: InsertJiraTask): Promise<JiraTask> {
+    const [task] = await db
+      .insert(jiraTasksTable)
+      .values({
+        ...insertTask,
+        lastSynced: new Date()
+      })
+      .onConflictDoUpdate({
+        target: jiraTasksTable.jiraId,
+        set: {
+          ...insertTask,
+          lastSynced: new Date()
+        }
+      })
+      .returning();
+    return task;
+  }
+
+  async deleteJiraTasksByUserId(userId: string): Promise<void> {
+    await db.delete(jiraTasksTable).where(eq(jiraTasksTable.userId, userId));
+  }
+
+  async getDailyCapacity(userId: string, date: Date): Promise<DailyCapacity | undefined> {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const [capacity] = await db
+      .select()
+      .from(dailyCapacityTable)
+      .where(
+        and(
+          eq(dailyCapacityTable.userId, userId),
+          eq(dailyCapacityTable.date, dayStart)
+        )
+      );
+    return capacity || undefined;
+  }
+
+  async getDailyCapacitiesForWeek(userId: string, weekStart: Date): Promise<DailyCapacity[]> {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    
+    return await db
+      .select()
+      .from(dailyCapacityTable)
+      .where(
+        and(
+          eq(dailyCapacityTable.userId, userId),
+          gte(dailyCapacityTable.date, weekStart),
+          lte(dailyCapacityTable.date, weekEnd)
+        )
+      );
+  }
+
+  async upsertDailyCapacity(insertCapacity: InsertDailyCapacity): Promise<DailyCapacity> {
+    const dayStart = new Date(insertCapacity.date);
+    dayStart.setHours(0, 0, 0, 0);
+    
+    const existing = await this.getDailyCapacity(insertCapacity.userId, dayStart);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(dailyCapacityTable)
+        .set({
+          ...insertCapacity,
+          date: dayStart,
+          calculatedAt: new Date()
+        })
+        .where(eq(dailyCapacityTable.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [capacity] = await db
+        .insert(dailyCapacityTable)
+        .values({
+          ...insertCapacity,
+          date: dayStart,
+          calculatedAt: new Date()
+        })
+        .returning();
+      return capacity;
+    }
+  }
+
+  async getTaskPredictions(userId: string, weekStart: Date): Promise<TaskCompletionPrediction[]> {
+    return await db
+      .select()
+      .from(taskCompletionPredictionsTable)
+      .where(
+        and(
+          eq(taskCompletionPredictionsTable.userId, userId),
+          eq(taskCompletionPredictionsTable.weekStartDate, weekStart)
+        )
+      );
+  }
+
+  async upsertTaskPrediction(insertPrediction: InsertTaskCompletionPrediction): Promise<TaskCompletionPrediction> {
+    const [prediction] = await db
+      .insert(taskCompletionPredictionsTable)
+      .values({
+        ...insertPrediction,
+        calculatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: [taskCompletionPredictionsTable.taskId, taskCompletionPredictionsTable.weekStartDate],
+        set: {
+          ...insertPrediction,
+          calculatedAt: new Date()
+        }
+      })
+      .returning();
+    return prediction;
+  }
+
+  async deleteTaskPredictionsByWeek(userId: string, weekStart: Date): Promise<void> {
+    await db
+      .delete(taskCompletionPredictionsTable)
+      .where(
+        and(
+          eq(taskCompletionPredictionsTable.userId, userId),
+          eq(taskCompletionPredictionsTable.weekStartDate, weekStart)
+        )
+      );
   }
 }
 

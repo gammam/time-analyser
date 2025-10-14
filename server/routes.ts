@@ -259,8 +259,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== JIRA INTEGRATION ROUTES ==========
+  
+  // Sync JIRA tasks
+  app.post("/api/jira/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { getUncachableJiraClient } = await import('./jira-client');
+      const jira = await getUncachableJiraClient();
+      
+      // Get current user info to find assigned issues
+      const myself = await jira.myself.getCurrentUser();
+      
+      // Search for issues assigned to current user that are not done
+      const searchResults = await jira.issueSearch.searchForIssuesUsingJql({
+        jql: `assignee = currentUser() AND status != Done ORDER BY dueDate ASC`,
+        maxResults: 100,
+        fields: ['summary', 'description', 'status', 'priority', 'duedate', 'assignee', 'project', 'labels', 'timeestimate', 'customfield_10016'] // customfield_10016 is usually story points
+      });
+      
+      const issues = searchResults.issues || [];
+      const syncedTasks = [];
+      
+      for (const issue of issues) {
+        const fields = issue.fields as any;
+        
+        // Convert time estimate from seconds to hours
+        const estimateHours = fields.timeestimate ? fields.timeestimate / 3600 : null;
+        
+        // Get story points (might be in different custom fields depending on Jira setup)
+        const storyPoints = fields.customfield_10016 || null;
+        
+        const taskData = {
+          userId,
+          jiraKey: issue.key || '',
+          jiraId: issue.id || '',
+          summary: fields.summary || '',
+          description: fields.description || '',
+          status: fields.status?.name || 'To Do',
+          priority: fields.priority?.name || 'Medium',
+          estimateHours,
+          storyPoints,
+          dueDate: fields.duedate ? new Date(fields.duedate) : null,
+          assignee: fields.assignee?.displayName || myself.displayName || '',
+          projectKey: fields.project?.key || '',
+          labels: fields.labels || []
+        };
+        
+        const task = await storage.upsertJiraTask(taskData);
+        syncedTasks.push(task);
+      }
+      
+      res.json({
+        success: true,
+        count: syncedTasks.length,
+        tasks: syncedTasks
+      });
+    } catch (error: any) {
+      console.error('Error syncing JIRA tasks:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync JIRA tasks' });
+    }
+  });
+  
+  // Get JIRA tasks
+  app.get("/api/jira/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status } = req.query;
+      
+      const tasks = await storage.getJiraTasksByUserId(userId, status as string | undefined);
+      res.json(tasks);
+    } catch (error: any) {
+      console.error('Error fetching JIRA tasks:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch JIRA tasks' });
+    }
+  });
+  
+  // Calculate daily capacity
+  app.post("/api/capacity/calculate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date } = req.body;
+      const targetDate = date ? new Date(date) : new Date();
+      
+      const { calculateDailyCapacity } = await import('./capacity-calculator');
+      
+      // Get meetings for the day
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(targetDate);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      const meetings = await storage.getMeetingsByUserId(userId, dayStart, dayEnd);
+      
+      // Get tasks (not done)
+      const allTasks = await storage.getJiraTasksByUserId(userId);
+      const activeTasks = allTasks.filter(t => t.status !== 'Done' && t.status !== 'Closed');
+      
+      // Calculate capacity
+      const capacity = calculateDailyCapacity(targetDate, meetings, activeTasks);
+      
+      // Save to database
+      const savedCapacity = await storage.upsertDailyCapacity({
+        userId,
+        date: targetDate,
+        ...capacity
+      });
+      
+      res.json(savedCapacity);
+    } catch (error: any) {
+      console.error('Error calculating capacity:', error);
+      res.status(500).json({ error: error.message || 'Failed to calculate capacity' });
+    }
+  });
+  
+  // Get weekly capacity
+  app.get("/api/capacity/week", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekStart } = req.query;
+      
+      const weekStartDate = weekStart ? new Date(weekStart as string) : getWeekStart(new Date());
+      const capacities = await storage.getDailyCapacitiesForWeek(userId, weekStartDate);
+      
+      res.json(capacities);
+    } catch (error: any) {
+      console.error('Error fetching weekly capacity:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch weekly capacity' });
+    }
+  });
+  
+  // Predict task completion for the week
+  app.post("/api/tasks/predict", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekStart } = req.body;
+      
+      const { predictWeeklyCompletion } = await import('./capacity-calculator');
+      
+      const weekStartDate = weekStart ? new Date(weekStart) : getWeekStart(new Date());
+      
+      // Get tasks (not done)
+      const allTasks = await storage.getJiraTasksByUserId(userId);
+      const activeTasks = allTasks.filter(t => t.status !== 'Done' && t.status !== 'Closed');
+      
+      // Get or calculate daily capacities for the week
+      let capacities = await storage.getDailyCapacitiesForWeek(userId, weekStartDate);
+      
+      if (capacities.length === 0) {
+        // Calculate capacities if not yet calculated
+        const { calculateDailyCapacity } = await import('./capacity-calculator');
+        capacities = [];
+        
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(weekStartDate);
+          date.setDate(date.getDate() + i);
+          
+          const dayStart = new Date(date);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(date);
+          dayEnd.setHours(23, 59, 59, 999);
+          
+          const meetings = await storage.getMeetingsByUserId(userId, dayStart, dayEnd);
+          const capacity = calculateDailyCapacity(date, meetings, activeTasks);
+          
+          const savedCapacity = await storage.upsertDailyCapacity({
+            userId,
+            date,
+            ...capacity
+          });
+          capacities.push(savedCapacity);
+        }
+      }
+      
+      // Predict completions
+      const { predictions, summary } = predictWeeklyCompletion(weekStartDate, activeTasks, capacities);
+      
+      // Save predictions
+      await storage.deleteTaskPredictionsByWeek(userId, weekStartDate);
+      for (const pred of predictions) {
+        await storage.upsertTaskPrediction({
+          ...pred,
+          userId
+        });
+      }
+      
+      res.json({
+        weekStart: weekStartDate,
+        summary,
+        predictions: predictions.map((p, i) => ({
+          ...p,
+          task: activeTasks[i]
+        }))
+      });
+    } catch (error: any) {
+      console.error('Error predicting task completion:', error);
+      res.status(500).json({ error: error.message || 'Failed to predict task completion' });
+    }
+  });
+  
+  // Get task predictions
+  app.get("/api/tasks/predictions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekStart } = req.query;
+      
+      const weekStartDate = weekStart ? new Date(weekStart as string) : getWeekStart(new Date());
+      const predictions = await storage.getTaskPredictions(userId, weekStartDate);
+      
+      res.json(predictions);
+    } catch (error: any) {
+      console.error('Error fetching predictions:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch predictions' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+}
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  const weekStart = new Date(d.setDate(diff));
+  weekStart.setHours(0, 0, 0, 0);
+  return weekStart;
 }
 
 function extractGoogleDocId(description: string | null | undefined): string | undefined {
@@ -287,7 +511,7 @@ function extractTextFromDoc(doc: any): string {
 }
 
 function groupMeetingsByDate(meetings: any[], scores: any[]): any[] {
-  const scoreMap = new Map(scores.map(s => s ? [s.meetingId, s.totalScore] : []));
+  const scoreMap = new Map(scores.filter(s => s).map(s => [s.meetingId, s.totalScore] as [string, number]));
   
   const dateGroups = new Map<string, { total: number; count: number }>();
   

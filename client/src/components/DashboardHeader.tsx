@@ -1,6 +1,7 @@
-import { Calendar, LogOut } from "lucide-react";
+import { Calendar, LogOut, BarChart3, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
+import { Link, useLocation } from "wouter";
 import {
   Select,
   SelectContent,
@@ -18,15 +19,41 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: DashboardHeaderProps) {
   const { user } = useAuth();
+  const [location] = useLocation();
   
   return (
     <header className="border-b bg-background sticky top-0 z-50">
       <div className="flex items-center justify-between p-4 gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Meeting Analyzer</h1>
+            <h1 className="text-xl font-bold">Productivity Analyzer</h1>
           </div>
+          
+          <nav className="flex gap-1">
+            <Link href="/">
+              <Button 
+                variant={location === "/" ? "default" : "ghost"} 
+                size="sm"
+                className="gap-2"
+                data-testid="nav-meetings"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Meetings
+              </Button>
+            </Link>
+            <Link href="/tasks">
+              <Button 
+                variant={location === "/tasks" ? "default" : "ghost"} 
+                size="sm"
+                className="gap-2"
+                data-testid="nav-tasks"
+              >
+                <ListTodo className="h-4 w-4" />
+                Tasks
+              </Button>
+            </Link>
+          </nav>
         </div>
         
         <div className="flex items-center gap-2">

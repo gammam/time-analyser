@@ -1,0 +1,33 @@
+1. Focalizzazione e Chiarezza dell'Obiettivo (per il Punteggio di Rilevanza)
+Dritto al sodo (Essentialism: The Disciplined Pursuit of Less) di Greg McKeown:
+
+Spunto per l'AI: Il libro è incentrato sull'identificazione del "poche cose essenziali". Il tuo AI può usarne i principi per assegnare un punteggio più alto alle riunioni con un titolo/obiettivo molto specifico e non generico (es. "Decisione su Budget Q4" vs. "Aggiornamento settimanale"). Suggerisce di chiedersi: "È l'uso più alto del mio tempo e delle mie risorse?".
+
+Una cosa sola (The ONE Thing) di Gary Keller e Jay Papasan:
+
+Spunto per l'AI: Promuove la concentrazione su un unico obiettivo cruciale. L'AI potrebbe penalizzare le riunioni il cui titolo o agenda elenca troppi argomenti non correlati, abbassando lo score di Chiarezza Obiettivo.
+
+2. Efficienza e Durata (per il Punteggio di Ottimizzazione)
+Deep Work: Concentrati al massimo di Cal Newport:
+
+Spunto per l'AI: Newport distingue tra Deep Work (lavoro profondo e concentrato) e Shallow Work (lavoro superficiale come email e, spesso, riunioni inutili). L'AI dovrebbe penalizzare le riunioni lunghe (soprattutto quelle ricorrenti) perché "rubano" tempo prezioso al Deep Work, abbassando lo score di Efficienza Tempo.
+
+The 12 Week Year (Fai di più in 12 settimane) di Brian Moran:
+
+Spunto per l'AI: Questo approccio suggerisce una pianificazione più breve e focalizzata. I concetti possono ispirare l'AI a dare un punteggio migliore alle riunioni che fanno riferimento a obiettivi e risultati con scadenze ravvicinate e chiare (punteggio Orientamento all'Azione).
+
+3. Struttura e Risultati (per il Punteggio di Qualità)
+Riunioni che servono davvero. Ottenere risultati migliori dalle riunioni di Duncan Peberdy e Jane Hammersley (Franco Angeli):
+
+Spunto per l'AI: Questo tipo di manuali manageriali forniscono spesso delle checklist o delle "domande chiave" per valutare l'efficacia di una riunione. Queste checklist sono perfette per definire i criteri di scoring dell'AI, ad esempio:
+
+C'è un'agenda chiara?
+
+È stata definita la responsabilità per i punti all'ordine del giorno (punti d'azione)?
+
+La riunione è terminata con la definizione di un piano d'azione concreto?
+
+Le cinque disfunzioni di un team di Patrick Lencioni:
+
+Spunto per l'AI: Sebbene sia incentrato sul team, Lencioni discute come l'"Evitamento dell'accountability" e la "Disattenzione ai risultati" rendano il lavoro inefficace. L'AI può usare questo come base per penalizzare riunioni (soprattutto i meeting di "stato") che non definiscono chiaramente le responsabilità future o non si focalizzano sui risultati ottenuti.
+

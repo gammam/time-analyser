@@ -70,12 +70,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const duration = (new Date(event.end.dateTime).getTime() - new Date(event.start.dateTime).getTime()) / (1000 * 60);
         
         const score = calculateMeetingScore({
+          title: event.summary,
           hasAgenda: agenda.hasAgenda,
           agendaLength: agenda.length,
+          agendaTopicsCount: agenda.topicsCount,
           participants: attendees.length,
           durationMinutes: duration,
           actionItemsCount: 0,
           attentionPointsCount: 0,
+          hasAccountability: false,
+          hasDeadlines: false,
         });
 
         // Upsert score to prevent duplicates
@@ -148,19 +152,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const doc = await docs.documents.get({ documentId: googleDocId });
 
       const content = extractTextFromDoc(doc.data);
-      const { actionItems, attentionPoints } = extractKeywordsFromNotes(content);
+      const { actionItems, attentionPoints, hasAccountability, hasDeadlines } = extractKeywordsFromNotes(content);
 
       // Recalculate score with notes data
       const agenda = extractAgendaFromDescription(meeting.description);
       const duration = (new Date(meeting.endTime).getTime() - new Date(meeting.startTime).getTime()) / (1000 * 60);
 
       const score = calculateMeetingScore({
+        title: meeting.title,
         hasAgenda: agenda.hasAgenda,
         agendaLength: agenda.length,
+        agendaTopicsCount: agenda.topicsCount,
         participants: meeting.participants,
         durationMinutes: duration,
         actionItemsCount: actionItems,
         attentionPointsCount: attentionPoints,
+        hasAccountability,
+        hasDeadlines,
       });
 
       // Upsert to prevent duplicate scores

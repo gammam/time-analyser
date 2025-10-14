@@ -62,10 +62,13 @@ async function getAccessToken() {
   }
   
   // Use the first accessible resource (JIRA site)
-  const hostName = resources[0].url;
   const cloudId = resources[0].id;
+  const siteName = resources[0].name;
   
-  console.log('Using JIRA site:', hostName, 'Cloud ID:', cloudId);
+  // For OAuth2, we must use the Atlassian API gateway, not the direct domain
+  const hostName = `https://api.atlassian.com/ex/jira/${cloudId}`;
+  
+  console.log('Using JIRA site:', siteName, 'Cloud ID:', cloudId, 'API Host:', hostName);
 
   return {accessToken, hostName};
 }

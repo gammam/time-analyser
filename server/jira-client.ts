@@ -81,10 +81,15 @@ async function getAccessToken() {
 export async function getUncachableJiraClient() {
   const { accessToken, hostName } = await getAccessToken();
 
+  console.log('Creating JIRA client with host:', hostName);
+  console.log('Token starts with:', accessToken?.substring(0, 20) + '...');
+
   return new Version3Client({
     host: hostName,
     authentication: {
-      oauth2: { accessToken },
+      oauth2: {
+        accessToken
+      },
     },
   });
 }

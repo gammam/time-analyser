@@ -35,14 +35,37 @@ async function getAccessToken() {
   console.log('Connection Settings:', JSON.stringify(connectionSettings, null, 2));
 
   const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
-  const hostName = connectionSettings?.settings?.site_url;
-
+  
+  // JIRA hostname needs to be obtained from accessible_resources API
+  // For now, we need to ask the user for their JIRA site URL
+  // The connection doesn't store it directly
   console.log('Access Token exists:', !!accessToken);
-  console.log('Host Name:', hostName);
+  console.log('Full connectionSettings:', JSON.stringify(connectionSettings, null, 2));
 
-  if (!connectionSettings || !accessToken || !hostName) {
-    throw new Error('Jira not connected');
+  if (!connectionSettings || !accessToken) {
+    throw new Error('Jira not connected - missing access token');
   }
+
+  // Try to get resources list from Atlassian API to find the JIRA site
+  const resourcesResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  const resources = await resourcesResponse.json();
+  console.log('Accessible Resources:', JSON.stringify(resources, null, 2));
+  
+  if (!resources || resources.length === 0) {
+    throw new Error('No accessible JIRA sites found');
+  }
+  
+  // Use the first accessible resource (JIRA site)
+  const hostName = resources[0].url;
+  const cloudId = resources[0].id;
+  
+  console.log('Using JIRA site:', hostName, 'Cloud ID:', cloudId);
 
   return {accessToken, hostName};
 }

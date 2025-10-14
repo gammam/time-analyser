@@ -64,13 +64,15 @@ async function getAccessToken() {
   // Use the first accessible resource (JIRA site)
   const cloudId = resources[0].id;
   const siteName = resources[0].name;
+  const siteUrl = resources[0].url; // e.g., https://pagopa.atlassian.net
   
-  // For OAuth2, we must use the Atlassian API gateway, not the direct domain
-  const hostName = `https://api.atlassian.com/ex/jira/${cloudId}`;
+  // For OAuth2 with jira.js library, use the direct domain
+  // The library will handle the API paths correctly
+  const hostName = siteUrl;
   
-  console.log('Using JIRA site:', siteName, 'Cloud ID:', cloudId, 'API Host:', hostName);
+  console.log('Using JIRA site:', siteName, 'Cloud ID:', cloudId, 'Site URL:', hostName);
 
-  return {accessToken, hostName};
+  return {accessToken, hostName, cloudId};
 }
 
 // WARNING: Never cache this client.

@@ -82,15 +82,46 @@ The backend follows a simple REST API architecture:
 
 ### Scoring Algorithm
 
-The meeting effectiveness score (0-100) is calculated from five weighted components:
+The meeting effectiveness score (0-100) is calculated from five weighted components, inspired by productivity and management principles from leading books:
 
-1. **Agenda Score (0-20)**: Based on presence and length of meeting description/agenda
-2. **Participants Score (0-20)**: Optimal range is 3-10 participants, with penalties for too few or too many
-3. **Timing Score (0-20)**: Rewards meetings of 30-45 minutes, with reduced scores for very short or long meetings
-4. **Actions Score (0-20)**: Based on count of action items found in linked Google Docs
-5. **Attention Score (0-20)**: Based on count of attention points/highlights in meeting notes
+1. **Agenda and Clarity Score (0-20)**: 
+   - **Principles**: *Essentialism* (Greg McKeown) and *The ONE Thing* (Gary Keller)
+   - Evaluates title specificity vs generic titles ("Meeting", "Sync", etc.)
+   - Rewards focused agendas, penalizes too many unrelated topics (>5)
+   - Bonus for specific titles over 20 characters
+   - Based on agenda presence, length, and topic count
 
-**Design Rationale**: The multi-factor scoring provides nuanced assessment of meeting quality. Each factor is independently tunable, allowing for easy adjustments based on user feedback or organizational preferences.
+2. **Participants Score (0-20)**: 
+   - Optimal range is 6-10 participants (20 points)
+   - Penalties for too few (1-2: 10 pts) or too many (>15: 14 pts)
+   - Balanced to allow effective discussion without dispersion
+
+3. **Timing and Efficiency Score (0-20)**: 
+   - **Principle**: *Deep Work* (Cal Newport) - protect time for focused work
+   - Optimal: 31-60 minutes (20 points)
+   - Heavy penalty for long meetings: >90 min (14 pts), >120 min (8 pts), >2h (5 pts)
+   - Rationale: Long meetings "steal" Deep Work time and reduce productivity
+
+4. **Actions and Accountability Score (0-20)**: 
+   - **Principles**: *Le cinque disfunzioni del team* (Lencioni) and *The 12 Week Year* (Moran)
+   - Base score from action count (6-10 actions optimal)
+   - Bonus +3 points for accountability keywords ("assigned to", "owner", "responsible", "DRI")
+   - Bonus +2 points for clear deadlines (dates, "by", "deadline", "due date")
+   - Ensures meetings produce concrete results with clear ownership and timing
+
+5. **Attention Score (0-20)**: 
+   - Count of attention points/highlights in meeting notes
+   - Keywords: "important", "critical", "decision", "blocker", "key point"
+   - 3-5 points optimal (20 pts)
+
+**Advanced Features**:
+- **Title Analysis**: Detects and penalizes generic meeting titles
+- **Topic Counting**: Identifies agenda items to enforce focus (The ONE Thing principle)
+- **Accountability Detection**: Finds responsibility assignments in notes
+- **Deadline Recognition**: Identifies dates and deadline keywords in multiple formats
+- **Deep Work Protection**: Heavily penalizes meetings over 90 minutes
+
+**Design Rationale**: The scoring integrates proven productivity principles to encourage effective meeting practices: clear focus (Essentialism), single priorities (The ONE Thing), time protection (Deep Work), accountability (Le cinque disfunzioni), and deadline-driven execution (The 12 Week Year). See `SCORING_CRITERIA.md` for detailed documentation.
 
 ## External Dependencies
 
@@ -142,9 +173,27 @@ The meeting effectiveness score (0-100) is calculated from five weighted compone
 
 **Design Rationale**: PostgreSQL provides ACID compliance and relational integrity needed for user data and meeting analytics. Neon's serverless architecture aligns with modern deployment patterns.
 
-## Recent Changes (October 13, 2025)
+## Recent Changes
 
-### Core Functionality Completed
+### October 14, 2025 - Enhanced Scoring Algorithm
+- ✅ **Productivity-Driven Scoring System**: Integrated principles from leading productivity books
+  - *Essentialism* (McKeown): Penalizes generic titles, rewards specific focused objectives
+  - *The ONE Thing* (Keller): Detects and penalizes agendas with too many unrelated topics (>5)
+  - *Deep Work* (Newport): Heavy penalties for long meetings that "steal" deep work time (>90 min)
+  - *The 12 Week Year* (Moran): Bonus points for clear deadlines in action items
+  - *Le cinque disfunzioni* (Lencioni): Bonus points for accountability assignments
+- ✅ **Advanced Text Analysis**:
+  - Title specificity detection (generic vs specific meeting names)
+  - Agenda topic counting to enforce focus
+  - Accountability keyword detection ("assigned to", "owner", "responsible", "DRI")
+  - Deadline recognition in multiple formats (dates, deadline keywords)
+- ✅ **Enhanced Scoring Logic**:
+  - Agenda score now evaluates title quality and topic count
+  - Timing score heavily penalizes meetings >90 minutes (Deep Work principle)
+  - Actions score rewards accountability (+3 pts) and deadlines (+2 pts)
+- ✅ **Documentation**: Created comprehensive `SCORING_CRITERIA.md` with examples and improvement tips
+
+### October 13, 2025 - Core Functionality
 - ✅ Full Google Calendar integration with OAuth via Replit Connectors
 - ✅ Google Docs integration for analyzing meeting notes
 - ✅ Meeting scoring algorithm implementation (5 criteria, 100 points total)

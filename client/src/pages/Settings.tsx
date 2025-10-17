@@ -153,7 +153,11 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader dateRange="today" onDateRangeChange={() => {}} />
+      <DashboardHeader 
+        dateRange="today" 
+        onDateRangeChange={() => {}}
+        hasJiraCredentials={settings?.hasJiraCredentials || false}
+      />
       
       <main className="container mx-auto p-6 max-w-4xl space-y-8">
         <div className="flex items-center gap-3">

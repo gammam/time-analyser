@@ -5,14 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { RefreshCw, AlertTriangle, CheckCircle2, Clock, Calendar } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle2, Clock, Calendar, Settings as SettingsIcon } from "lucide-react";
 import { syncJiraTasks, getJiraTasks, predictWeeklyTasks, type JiraTask, type WeeklyPredictionSummary } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
+import type { UserSettings } from "@shared/schema";
+
+interface SettingsResponse extends Omit<UserSettings, 'googleAccessToken' | 'googleRefreshToken' | 'googleTokenExpiry' | 'jiraApiToken'> {
+  hasGoogleCredentials: boolean;
+  hasJiraCredentials: boolean;
+}
 
 export default function TaskAnalysis() {
   const { toast } = useToast();
+
+  // Fetch user settings to check JIRA credentials
+  const { data: settings } = useQuery<SettingsResponse>({
+    queryKey: ["/api/settings"],
+  });
   const [selectedWeek, setSelectedWeek] = useState(() => {
     const now = new Date();
     const day = now.getDay();
@@ -90,7 +101,11 @@ export default function TaskAnalysis() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader dateRange="today" onDateRangeChange={() => {}} />
+      <DashboardHeader 
+        dateRange="today" 
+        onDateRangeChange={() => {}}
+        hasJiraCredentials={settings?.hasJiraCredentials || false}
+      />
       
       <main className="container mx-auto p-6 space-y-8">
         <div className="flex items-center justify-between">
@@ -101,7 +116,7 @@ export default function TaskAnalysis() {
           <div className="flex gap-2">
             <Button 
               onClick={() => syncTasksMutation.mutate()} 
-              disabled={syncTasksMutation.isPending}
+              disabled={syncTasksMutation.isPending || !settings?.hasJiraCredentials}
               data-testid="button-sync-tasks"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${syncTasksMutation.isPending ? 'animate-spin' : ''}`} />
@@ -109,7 +124,7 @@ export default function TaskAnalysis() {
             </Button>
             <Button 
               onClick={() => predictTasksMutation.mutate()} 
-              disabled={predictTasksMutation.isPending || activeTasks.length === 0}
+              disabled={predictTasksMutation.isPending || activeTasks.length === 0 || !settings?.hasJiraCredentials}
               variant="secondary"
               data-testid="button-predict-tasks"
             >
@@ -118,6 +133,43 @@ export default function TaskAnalysis() {
             </Button>
           </div>
         </div>
+
+        {!settings?.hasJiraCredentials && (
+          <Card className="border-blue-500/50 bg-blue-500/5" data-testid="card-jira-setup">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-blue-500" />
+                JIRA Configuration Required
+              </CardTitle>
+              <CardDescription>
+                Connect your JIRA account to use task completion prediction
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                To analyze and predict task completion, you need to configure your JIRA credentials in Settings.
+              </p>
+              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                <p className="text-sm font-medium">How to set up JIRA:</p>
+                <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
+                  <li>Go to Settings (menu in top-right)</li>
+                  <li>Create an API Token on your Atlassian account</li>
+                  <li>Enter your email, Atlassian URL, and API Token</li>
+                  <li>Optionally add a custom JQL query to filter tasks</li>
+                  <li>Save and return here to sync your tasks</li>
+                </ol>
+              </div>
+              <Button 
+                onClick={() => window.location.href = '/settings'}
+                className="w-full sm:w-auto"
+                data-testid="button-go-to-settings"
+              >
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Go to Settings
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {loadingTasks || loadingPredictions ? (
           <div className="grid gap-6 md:grid-cols-3">

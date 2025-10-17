@@ -44,6 +44,34 @@ The application uses a **PostgreSQL database** via **Drizzle ORM**. Key features
 
 **Replit Auth with OpenID Connect (OIDC)** is used for authentication, supporting multiple OAuth providers. Session-based authentication is implemented with PostgreSQL-backed session storage. Protected API routes are secured with `isAuthenticated` middleware, and the frontend integrates an `useAuth` hook for managing user state. Security features include HTTP-only, secure, and SameSite "lax" cookies.
 
+### Onboarding Flow
+
+**First-Time User Experience**: New users are guided through a multi-step onboarding process on their first login:
+
+**User Table Field**:
+- `hasCompletedOnboarding` (integer, default 0): Tracks whether user has completed onboarding flow (0 = not completed, 1 = completed)
+
+**Onboarding Steps**:
+1. **Welcome Screen**: Introduces ProdBuddy features (meeting analysis, JIRA predictions, gamification)
+2. **Google Calendar Connection**: Prompts user to connect their Google account with real-time connection status
+3. **JIRA Configuration (Optional)**: Explains JIRA setup process and directs users to Settings for configuration
+
+**Technical Implementation**:
+- `OnboardingModal` component displays automatically when `hasCompletedOnboarding === 0`
+- Modal checks `hasGoogleCredentials` flag from `/api/settings` to show connection status
+- POST `/api/auth/complete-onboarding` endpoint marks onboarding as complete
+- Frontend invalidates user query cache after completion to update UI
+
+**Navigation Access Control**:
+- **Tasks Tab**: Hidden from navigation when `hasJiraCredentials === false`
+- **Tasks Page**: Shows informative setup card with instructions when JIRA not configured
+- **Sync/Predict Buttons**: Disabled when JIRA credentials not present
+
+**Security**:
+- All credential checks use boolean flags (`hasGoogleCredentials`, `hasJiraCredentials`) from API
+- Actual tokens (`googleAccessToken`, `jiraApiToken`) never exposed to frontend
+- `SettingsResponse` interface omits sensitive credential fields for type safety
+
 ### Scoring Algorithm
 
 Meeting effectiveness (0-100) is calculated based on five weighted components, incorporating principles from productivity books:

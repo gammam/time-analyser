@@ -71,6 +71,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete onboarding
+  app.post('/api/auth/complete-onboarding', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Update user to mark onboarding as complete
+      const updatedUser = await storage.upsertUser({
+        ...user,
+        hasCompletedOnboarding: 1,
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
   // Google OAuth - Initiate authentication
   app.get('/auth/google', isAuthenticated, async (req: any, res) => {
     try {

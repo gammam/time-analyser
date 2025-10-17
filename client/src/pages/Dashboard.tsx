@@ -11,10 +11,21 @@ import { RefreshCw, AlertCircle } from "lucide-react";
 import { getMeetings, getStats, syncMeetings, getCurrentChallenge, getAchievements, type MeetingWithScore } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { UserSettings } from "@shared/schema";
+
+interface SettingsResponse extends Omit<UserSettings, 'googleAccessToken' | 'googleRefreshToken' | 'googleTokenExpiry' | 'jiraApiToken'> {
+  hasGoogleCredentials: boolean;
+  hasJiraCredentials: boolean;
+}
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState("today");
   const { toast } = useToast();
+
+  // Fetch user settings to check JIRA credentials
+  const { data: settings } = useQuery<SettingsResponse>({
+    queryKey: ["/api/settings"],
+  });
 
   const getDateRange = () => {
     const now = new Date();
@@ -125,7 +136,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <DashboardHeader 
+        dateRange={dateRange} 
+        onDateRangeChange={setDateRange}
+        hasJiraCredentials={settings?.hasJiraCredentials || false}
+      />
       
       <main className="container mx-auto p-6 space-y-8">
         <div className="flex items-center justify-between">

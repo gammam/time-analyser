@@ -261,15 +261,52 @@ export default function TaskAnalysis() {
             )}
 
             {!predictions && activeTasks.length > 0 && (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground mb-4">Click "Analyze Week" to predict task completion</p>
-                  <Button onClick={() => predictTasksMutation.mutate()} data-testid="button-analyze-now">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Analyze Now
-                  </Button>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground mb-4">Click "Analyze Week" to predict task completion</p>
+                    <Button onClick={() => predictTasksMutation.mutate()} data-testid="button-analyze-now">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Analyze Now
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Active Tasks ({activeTasks.length})</h3>
+                  {activeTasks.map((task) => (
+                    <Card key={task.id} className="hover-elevate" data-testid={`card-task-${task.id}`}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-base" data-testid={`text-task-summary-${task.id}`}>
+                              {task.jiraKey}: {task.summary}
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                              {task.projectKey} • {task.priority} Priority • Status: {task.status}
+                              {task.dueDate && ` • Due ${format(parseISO(task.dueDate), 'MMM d, yyyy')}`}
+                            </CardDescription>
+                          </div>
+                          {task.priority && (
+                            <Badge variant={task.priority === 'High' || task.priority === 'Highest' ? 'destructive' : 'secondary'}>
+                              {task.priority}
+                            </Badge>
+                          )}
+                        </div>
+                      </CardHeader>
+                      {(task.estimateHours || task.storyPoints || task.assignee) && (
+                        <CardContent>
+                          <div className="flex gap-4 text-sm text-muted-foreground">
+                            {task.estimateHours && <span>Est: {task.estimateHours}h</span>}
+                            {task.storyPoints && <span>SP: {task.storyPoints}</span>}
+                            {task.assignee && <span>Assignee: {task.assignee}</span>}
+                          </div>
+                        </CardContent>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </>
             )}
 
             {activeTasks.length === 0 && (

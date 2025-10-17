@@ -15,8 +15,9 @@ Preferred communication style: Simple, everyday language.
 The frontend is built with **React and TypeScript** using **Vite**. It features a component-based architecture with **shadcn/ui** components based on Radix UI for accessibility and customization. Styling is managed with **Tailwind CSS**, supporting light/dark modes and a productivity-focused aesthetic. **TanStack Query** handles server state, caching, and API calls, while **Wouter** provides client-side routing. **React Hook Form** with **Zod** resolvers is used for form handling and validation.
 
 **Key UI Components:**
-- **DashboardHeader**: Main navigation with user avatar dropdown menu (Settings, Logout)
+- **DashboardHeader**: Main navigation with user avatar dropdown menu (Settings, Logout) and Feedback button
 - **Settings Page**: User configuration for work hours and context switching parameters
+- **FeedbackDialog**: Modal dialog containing embedded Tally form for user feedback collection
 
 ### Backend
 
@@ -131,6 +132,28 @@ The system includes **Weekly Challenges** generated based on a user's weakest sc
 - GET `/api/settings` returns `hasJiraCredentials` boolean instead of the token
 - Password input field clears after save for additional security
 - Empty strings are converted to null, allowing users to clear credentials and revert to env-based defaults
+
+### User Feedback System
+
+**Tally Form Integration**: Users can provide feedback directly from the application through an embedded Tally form:
+
+**UI Implementation**:
+- **Feedback Button**: Always visible in DashboardHeader across all pages
+- **FeedbackDialog**: Modal component using shadcn Dialog with embedded Tally iframe
+- **Auto-close**: Dialog closes automatically after form submission via postMessage API
+
+**Feedback Questions**:
+1. Knowledge of alternative solutions (competitive landscape)
+2. Pain points and frustrations in user experience
+3. Positive aspects of the application
+4. Insights discovered from meeting analysis
+5. General comments and suggestions
+
+**Technical Details**:
+- Tally widget script loaded dynamically when dialog opens
+- Iframe configured with optimal parameters: `transparentBackground`, `dynamicHeight`, `alignLeft`, `hideTitle`
+- Event listener for `Tally.FormSubmitted` event to auto-close dialog
+- Responsive modal with scroll support for mobile devices
 
 ## External Dependencies
 

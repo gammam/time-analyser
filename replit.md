@@ -1,8 +1,8 @@
-# Meeting Trend Analyzer
+# ProdBuddy
 
 ## Overview
 
-The Meeting Trend Analyzer is a productivity dashboard application designed to evaluate and improve meeting effectiveness. It scores meetings based on factors like agenda quality, participant count, timing, action items, and attention points, integrating with Google Calendar and Google Docs to automate data syncing and note analysis. The application provides users with actionable insights into their meeting habits, supports gamification through challenges and achievements, and offers a JIRA task prediction system to help users manage their workload more effectively.
+ProdBuddy is your friendly productivity assistant - a productivity dashboard application designed to evaluate and improve meeting effectiveness. It scores meetings based on factors like agenda quality, participant count, timing, action items, and attention points, integrating with Google Calendar and Google Docs to automate data syncing and note analysis. The application provides users with actionable insights into their meeting habits, supports gamification through challenges and achievements, and offers a JIRA task prediction system to help users manage their workload more effectively.
 
 ## User Preferences
 

@@ -1,10 +1,10 @@
-# Meeting Trend Analyzer
+# ProdBuddy
 
-A comprehensive productivity dashboard that evaluates meeting effectiveness and predicts JIRA task completion based on available time and context switching overhead.
+Your friendly productivity assistant that evaluates meeting effectiveness and predicts JIRA task completion based on available time and context switching overhead.
 
 ## 🎯 Overview
 
-Meeting Trend Analyzer is a full-stack TypeScript application designed to help teams improve their meeting habits and manage workload more effectively. It combines:
+ProdBuddy is a full-stack TypeScript application designed to help teams improve their meeting habits and manage workload more effectively. It combines:
 
 - **Meeting Effectiveness Scoring** (0-100 points) based on productivity principles
 - **Google Calendar & Docs Integration** for automated data syncing and note analysis

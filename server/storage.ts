@@ -1,4 +1,4 @@
-import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement, type JiraTask, type InsertJiraTask, type DailyCapacity, type InsertDailyCapacity, type TaskCompletionPrediction, type InsertTaskCompletionPrediction } from "@shared/schema";
+import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement, type JiraTask, type InsertJiraTask, type DailyCapacity, type InsertDailyCapacity, type TaskCompletionPrediction, type InsertTaskCompletionPrediction, type UserSettings, type InsertUserSettings, type UpdateUserSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -43,12 +43,16 @@ export interface IStorage {
   getTaskPredictions(userId: string, weekStart: Date): Promise<TaskCompletionPrediction[]>;
   upsertTaskPrediction(prediction: InsertTaskCompletionPrediction): Promise<TaskCompletionPrediction>;
   deleteTaskPredictionsByWeek(userId: string, weekStart: Date): Promise<void>;
+  
+  // User settings methods
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  upsertUserSettings(userId: string, settings: UpdateUserSettings): Promise<UserSettings>;
 }
 
 // Import database and Drizzle ORM utilities
 // Reference: blueprint:javascript_database
 import { db } from "./db";
-import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable, jiraTasks as jiraTasksTable, dailyCapacity as dailyCapacityTable, taskCompletionPredictions as taskCompletionPredictionsTable } from "@shared/schema";
+import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable, jiraTasks as jiraTasksTable, dailyCapacity as dailyCapacityTable, taskCompletionPredictions as taskCompletionPredictionsTable, userSettings as userSettingsTable } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export class DatabaseStorage implements IStorage {
@@ -393,6 +397,33 @@ export class DatabaseStorage implements IStorage {
           eq(taskCompletionPredictionsTable.weekStartDate, weekStart)
         )
       );
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(userSettingsTable)
+      .where(eq(userSettingsTable.userId, userId));
+    return settings || undefined;
+  }
+
+  async upsertUserSettings(userId: string, settingsData: UpdateUserSettings): Promise<UserSettings> {
+    const [settings] = await db
+      .insert(userSettingsTable)
+      .values({
+        userId,
+        ...settingsData,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: userSettingsTable.userId,
+        set: {
+          ...settingsData,
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+    return settings;
   }
 }
 

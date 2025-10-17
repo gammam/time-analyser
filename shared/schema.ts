@@ -125,6 +125,14 @@ export const taskCompletionPredictions = pgTable("task_completion_predictions", 
   uniqueIndex("idx_task_predictions_task_week").on(table.taskId, table.weekStartDate),
 ]);
 
+export const userSettings = pgTable("user_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  dailyWorkHours: real("daily_work_hours").notNull().default(8),
+  contextSwitchingMinutes: integer("context_switching_minutes").notNull().default(20),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+});
+
 // Upsert schema for Replit Auth
 // Reference: blueprint:javascript_log_in_with_replit
 export const upsertUserSchema = createInsertSchema(users).omit({
@@ -166,6 +174,16 @@ export const insertTaskCompletionPredictionSchema = createInsertSchema(taskCompl
   calculatedAt: true,
 });
 
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const updateUserSettingsSchema = insertUserSettingsSchema.partial().extend({
+  dailyWorkHours: z.number().min(0.5, "Daily work hours must be at least 0.5").max(24, "Daily work hours cannot exceed 24").optional(),
+  contextSwitchingMinutes: z.number().int("Context switching must be a whole number").min(0, "Context switching cannot be negative").max(60, "Context switching cannot exceed 60 minutes").optional(),
+});
+
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Meeting = typeof meetings.$inferSelect;
@@ -182,3 +200,6 @@ export type DailyCapacity = typeof dailyCapacity.$inferSelect;
 export type InsertDailyCapacity = z.infer<typeof insertDailyCapacitySchema>;
 export type TaskCompletionPrediction = typeof taskCompletionPredictions.$inferSelect;
 export type InsertTaskCompletionPrediction = z.infer<typeof insertTaskCompletionPredictionSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+export type UpdateUserSettings = z.infer<typeof updateUserSettingsSchema>;

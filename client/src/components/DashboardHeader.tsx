@@ -97,12 +97,12 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: Dash
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <Link href="/settings">
-                  <DropdownMenuItem data-testid="menu-settings">
+                <DropdownMenuItem asChild data-testid="menu-settings">
+                  <Link href="/settings">
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
-                  </DropdownMenuItem>
-                </Link>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => window.location.href = '/api/logout'} data-testid="menu-logout">
                   <LogOut className="mr-2 h-4 w-4" />

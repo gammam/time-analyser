@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { getUncachableGoogleCalendarClient } from "./google-calendar";
 import { getUncachableGoogleDocsClient } from "./google-docs";
 import { calculateMeetingScore, extractAgendaFromDescription, extractKeywordsFromNotes } from "./scoring";
-import { insertMeetingSchema, insertMeetingScoreSchema } from "@shared/schema";
+import { insertMeetingSchema, insertMeetingScoreSchema, updateUserSettingsSchema } from "@shared/schema";
 import { generateWeeklyChallenge, updateChallengeProgress } from "./gamification";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -502,6 +502,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Error fetching predictions:', error);
       res.status(500).json({ error: error.message || 'Failed to fetch predictions' });
+    }
+  });
+
+  // Get user settings
+  app.get("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const settings = await storage.getUserSettings(userId);
+      
+      res.json({
+        dailyWorkHours: settings?.dailyWorkHours || 8,
+        contextSwitchingMinutes: settings?.contextSwitchingMinutes || 20
+      });
+    } catch (error: any) {
+      console.error('Error fetching settings:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch settings' });
+    }
+  });
+
+  // Update user settings
+  app.post("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const validated = updateUserSettingsSchema.parse(req.body);
+      
+      const settings = await storage.upsertUserSettings(userId, validated);
+      
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Error updating settings:', error);
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Invalid settings data', details: error.errors });
+      } else {
+        res.status(500).json({ error: error.message || 'Failed to update settings' });
+      }
     }
   });
 

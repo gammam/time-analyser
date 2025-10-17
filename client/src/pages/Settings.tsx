@@ -1,25 +1,58 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Settings as SettingsIcon, Save } from "lucide-react";
+
+interface SettingsData {
+  dailyWorkHours: number;
+  contextSwitchingMinutes: number;
+}
 
 export default function Settings() {
   const { toast } = useToast();
-  const [jqlQuery, setJqlQuery] = useState("");
+  const [dailyWorkHours, setDailyWorkHours] = useState<number>(8);
+  const [contextSwitchingMinutes, setContextSwitchingMinutes] = useState<number>(20);
+
+  const { data: settings, isLoading, error } = useQuery<SettingsData>({
+    queryKey: ['/api/settings'],
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setDailyWorkHours(settings.dailyWorkHours);
+      setContextSwitchingMinutes(settings.contextSwitchingMinutes);
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Failed to load settings",
+        description: "Could not retrieve your settings. Please try refreshing the page.",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   const saveSettingsMutation = useMutation({
-    mutationFn: async (data: { jqlQuery: string }) => {
+    mutationFn: async (data: { dailyWorkHours: number; contextSwitchingMinutes: number }) => {
+      return await apiRequest('/api/settings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
       toast({
         title: "Settings saved",
-        description: "Your JQL query has been updated. Please restart the application for changes to take effect.",
+        description: "Your work configuration has been updated successfully.",
       });
-      return data;
     },
     onError: (error: any) => {
       toast({
@@ -29,6 +62,13 @@ export default function Settings() {
       });
     },
   });
+
+  const handleSave = () => {
+    saveSettingsMutation.mutate({
+      dailyWorkHours,
+      contextSwitchingMinutes
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,45 +85,9 @@ export default function Settings() {
 
         <Card>
           <CardHeader>
-            <CardTitle>JIRA Integration</CardTitle>
-            <CardDescription>
-              Configure how tasks are fetched from JIRA
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="jql-query">JQL Query</Label>
-              <Textarea
-                id="jql-query"
-                placeholder="type IN (Task) and assignee = currentUser() and statusCategory != Done order BY type DESC"
-                value={jqlQuery}
-                onChange={(e) => setJqlQuery(e.target.value)}
-                rows={4}
-                data-testid="input-jql-query"
-                className="font-mono text-sm"
-              />
-              <p className="text-sm text-muted-foreground">
-                Enter a JQL query to filter your JIRA tasks. Leave empty to use the default query.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Current Query (from environment)</Label>
-              <div className="p-3 bg-muted rounded-md font-mono text-sm text-muted-foreground">
-                {import.meta.env.JIRA_JQL_QUERY || "type IN (Task) and assignee = currentUser() and statusCategory != Done order BY type DESC"}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Note: To change this permanently, update the JIRA_JQL_QUERY secret in your Replit environment.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Work Hours Configuration</CardTitle>
             <CardDescription>
-              Set your daily work schedule
+              Set your daily work schedule and context switching overhead
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -93,13 +97,16 @@ export default function Settings() {
                 <Input
                   id="work-hours"
                   type="number"
-                  placeholder="8"
+                  value={dailyWorkHours}
+                  onChange={(e) => setDailyWorkHours(parseFloat(e.target.value))}
                   min="1"
                   max="24"
+                  step="0.5"
                   data-testid="input-work-hours"
+                  disabled={isLoading}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Default: 8 hours per day
+                  Hours available for work each day
                 </p>
               </div>
               <div className="space-y-2">
@@ -107,13 +114,16 @@ export default function Settings() {
                 <Input
                   id="context-switch"
                   type="number"
-                  placeholder="20"
+                  value={contextSwitchingMinutes}
+                  onChange={(e) => setContextSwitchingMinutes(parseInt(e.target.value))}
                   min="0"
                   max="60"
+                  step="5"
                   data-testid="input-context-switch"
+                  disabled={isLoading}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Default: 20 minutes per task
+                  Time lost when switching between tasks
                 </p>
               </div>
             </div>
@@ -136,12 +146,12 @@ export default function Settings() {
 
         <div className="flex justify-end">
           <Button 
-            onClick={() => saveSettingsMutation.mutate({ jqlQuery })}
-            disabled={saveSettingsMutation.isPending}
+            onClick={handleSave}
+            disabled={saveSettingsMutation.isPending || isLoading}
             data-testid="button-save"
           >
             <Save className="h-4 w-4 mr-2" />
-            Save Settings
+            {saveSettingsMutation.isPending ? "Saving..." : "Save Settings"}
           </Button>
         </div>
       </main>

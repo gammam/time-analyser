@@ -319,19 +319,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const syncedTasks = [];
       
       for (const issue of issues) {
+        const fields = issue.fields || {};
+        
         const taskData = {
           userId,
           jiraKey: issue.key || '',
           jiraId: issue.id || '',
-          summary: issue.summary || '',
+          summary: fields.summary || '',
           description: '', 
-          status: issue.status || 'To Do',
-          priority: issue.priority || 'Medium',
-          estimateHours: issue.timeestimate ? issue.timeestimate / 3600 : null,
+          status: fields.status?.name || 'To Do',
+          priority: fields.priority?.name || 'Medium',
+          estimateHours: fields.timeestimate ? fields.timeestimate / 3600 : null,
           storyPoints: null,
           dueDate: null,
-          assignee: issue.assignee || 'Unassigned',
-          projectKey: issue.project || '',
+          assignee: fields.assignee?.displayName || 'Unassigned',
+          projectKey: fields.project?.key || '',
           labels: []
         };
         

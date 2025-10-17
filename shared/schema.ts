@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, json, real, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, json, real, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -93,7 +93,10 @@ export const jiraTasks = pgTable("jira_tasks", {
   projectKey: text("project_key"),
   labels: text("labels").array().default(sql`ARRAY[]::text[]`),
   lastSynced: timestamp("last_synced").default(sql`now()`),
-});
+}, (table) => [
+  index("idx_jira_tasks_user_id").on(table.userId),
+  uniqueIndex("idx_jira_tasks_user_key").on(table.userId, table.jiraKey),
+]);
 
 export const dailyCapacity = pgTable("daily_capacity", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

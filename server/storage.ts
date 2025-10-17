@@ -278,7 +278,7 @@ export class DatabaseStorage implements IStorage {
         lastSynced: new Date()
       })
       .onConflictDoUpdate({
-        target: jiraTasksTable.jiraId,
+        target: [jiraTasksTable.userId, jiraTasksTable.jiraKey],
         set: {
           ...insertTask,
           lastSynced: new Date()

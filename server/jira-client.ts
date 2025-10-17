@@ -1,94 +1,34 @@
 import { Version3Client } from 'jira.js';
 
-let connectionSettings: any;
+// JIRA Client using Personal Access Token (PAT) with Basic Authentication
+// This is more reliable than OAuth2 for user-specific operations
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
+async function getJiraConfig() {
+  const email = process.env.JIRA_EMAIL;
+  const apiToken = process.env.JIRA_API_TOKEN;
+  const host = process.env.JIRA_HOST || 'https://pagopa.atlassian.net'; // Default host
   
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!email || !apiToken) {
+    throw new Error('JIRA credentials not configured. Please set JIRA_EMAIL and JIRA_API_TOKEN environment variables.');
   }
 
-  const response = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=jira',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  );
-  
-  const data = await response.json();
-  console.log('JIRA Connection Response:', JSON.stringify(data, null, 2));
-  
-  connectionSettings = data.items?.[0];
-  console.log('Connection Settings:', JSON.stringify(connectionSettings, null, 2));
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
-  
-  // JIRA hostname needs to be obtained from accessible_resources API
-  // For now, we need to ask the user for their JIRA site URL
-  // The connection doesn't store it directly
-  console.log('Access Token exists:', !!accessToken);
-  console.log('Full connectionSettings:', JSON.stringify(connectionSettings, null, 2));
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Jira not connected - missing access token');
-  }
-
-  // Try to get resources list from Atlassian API to find the JIRA site
-  const resourcesResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/json'
-    }
-  });
-
-  const resources = await resourcesResponse.json();
-  console.log('Accessible Resources:', JSON.stringify(resources, null, 2));
-  
-  if (!resources || resources.length === 0) {
-    throw new Error('No accessible JIRA sites found');
-  }
-  
-  // Use the first accessible resource (JIRA site)
-  const cloudId = resources[0].id;
-  const siteName = resources[0].name;
-  const siteUrl = resources[0].url; // e.g., https://pagopa.atlassian.net
-  
-  // For OAuth2 with jira.js library, use the direct domain
-  // The library will handle the API paths correctly
-  const hostName = siteUrl;
-  
-  console.log('Using JIRA site:', siteName, 'Cloud ID:', cloudId, 'Site URL:', hostName);
-
-  return {accessToken, hostName, cloudId};
+  return { email, apiToken, host };
 }
 
 // WARNING: Never cache this client.
-// Access tokens expire, so a new client must be created each time.
-// Always call this function again to get a fresh client.
+// Always call this function to get a fresh client.
 export async function getUncachableJiraClient() {
-  const { accessToken, hostName } = await getAccessToken();
+  const { email, apiToken, host } = await getJiraConfig();
 
-  console.log('Creating JIRA client with host:', hostName);
-  console.log('Token starts with:', accessToken?.substring(0, 20) + '...');
+  console.log('Creating JIRA client with Basic auth for:', email);
+  console.log('Using JIRA host:', host);
 
   return new Version3Client({
-    host: hostName,
+    host,
     authentication: {
-      oauth2: {
-        accessToken
+      basic: {
+        email,
+        apiToken,
       },
     },
   });

@@ -189,7 +189,7 @@ export default function TaskAnalysis() {
                   )}
                 </div>
                 {activeTasks.map((task) => {
-                  const prediction = predictions?.predictions.find(p => p.taskId === task.id);
+                  const prediction = predictions?.predictions?.find(p => p.taskId === task.id);
                   return (
                     <Card key={task.id} className="hover-elevate" data-testid={`card-task-${task.id}`}>
                       <CardHeader>

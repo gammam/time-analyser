@@ -130,6 +130,10 @@ export const userSettings = pgTable("user_settings", {
   userId: varchar("user_id").references(() => users.id).notNull().unique(),
   dailyWorkHours: real("daily_work_hours").notNull().default(8),
   contextSwitchingMinutes: integer("context_switching_minutes").notNull().default(20),
+  jiraEmail: text("jira_email"),
+  jiraApiToken: text("jira_api_token"),
+  jiraHost: text("jira_host"),
+  jiraJqlQuery: text("jira_jql_query"),
   updatedAt: timestamp("updated_at").default(sql`now()`),
 });
 
@@ -182,6 +186,23 @@ export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
 export const updateUserSettingsSchema = insertUserSettingsSchema.partial().extend({
   dailyWorkHours: z.number().min(0.5, "Daily work hours must be at least 0.5").max(24, "Daily work hours cannot exceed 24").optional(),
   contextSwitchingMinutes: z.number().int("Context switching must be a whole number").min(0, "Context switching cannot be negative").max(60, "Context switching cannot exceed 60 minutes").optional(),
+  jiraEmail: z.string().email("Invalid email format").optional().or(z.literal("")),
+  jiraApiToken: z.string().min(1, "API token cannot be empty").optional().or(z.literal("")),
+  jiraHost: z.string().url("Invalid URL format").optional().or(z.literal("")),
+  jiraJqlQuery: z.string().optional().or(z.literal("")),
+});
+
+// Safe schema for GET requests - excludes sensitive jiraApiToken
+export const userSettingsResponseSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  dailyWorkHours: z.number(),
+  contextSwitchingMinutes: z.number(),
+  jiraEmail: z.string().nullable(),
+  jiraHost: z.string().nullable(),
+  jiraJqlQuery: z.string().nullable(),
+  hasJiraCredentials: z.boolean(), // Indicates if jiraApiToken is configured
+  updatedAt: z.date().nullable(),
 });
 
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
@@ -203,3 +224,4 @@ export type InsertTaskCompletionPrediction = z.infer<typeof insertTaskCompletion
 export type UserSettings = typeof userSettings.$inferSelect;
 export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
 export type UpdateUserSettings = z.infer<typeof updateUserSettingsSchema>;
+export type UserSettingsResponse = z.infer<typeof userSettingsResponseSchema>;

@@ -1,4 +1,4 @@
-import { Calendar, LogOut, BarChart3, ListTodo, Settings } from "lucide-react";
+import { LogOut, BarChart3, ListTodo, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Link, useLocation } from "wouter";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import logoUrl from "@assets/generated_images/ProdBuddy_productivity_assistant_logo_e1b28eb0.png";
 
 interface DashboardHeaderProps {
   onDateRangeChange?: (range: string) => void;
@@ -34,8 +35,8 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: Dash
       <div className="flex items-center justify-between p-4 gap-4">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Productivity Analyzer</h1>
+            <img src={logoUrl} alt="ProdBuddy" className="h-8 w-8" />
+            <h1 className="text-xl font-bold">ProdBuddy</h1>
           </div>
           
           <nav className="flex gap-1">

@@ -1,4 +1,4 @@
-import { Calendar, LogOut, BarChart3, ListTodo } from "lucide-react";
+import { Calendar, LogOut, BarChart3, ListTodo, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Link, useLocation } from "wouter";
@@ -9,6 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -70,24 +78,39 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today" }: Dash
           </Select>
           
           {user && (
-            <div className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.profileImageUrl} alt={user.email || "User"} />
-                <AvatarFallback>
-                  {user.firstName?.[0] || user.email?.[0] || "U"}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="button-user-menu">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.profileImageUrl} alt={user.email || "User"} />
+                    <AvatarFallback>
+                      {user.firstName?.[0] || user.email?.[0] || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.firstName || "User"}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <Link href="/settings">
+                  <DropdownMenuItem data-testid="menu-settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.location.href = '/api/logout'} data-testid="menu-logout">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => window.location.href = '/api/logout'}
-            data-testid="button-logout"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
           
           <ThemeToggle />
         </div>

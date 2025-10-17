@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/Dashboard";
 import TaskAnalysis from "@/pages/TaskAnalysis";
+import Settings from "@/pages/Settings";
 import Landing from "@/pages/Landing";
 import NotFound from "@/pages/not-found";
 
@@ -36,6 +37,7 @@ function Router() {
             <>
               <Route path="/" component={Dashboard} />
               <Route path="/tasks" component={TaskAnalysis} />
+              <Route path="/settings" component={Settings} />
             </>
           )}
           <Route component={NotFound} />

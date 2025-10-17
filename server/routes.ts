@@ -14,6 +14,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reference: blueprint:javascript_log_in_with_replit
   await setupAuth(app);
 
+  // Privacy Policy and Terms of Service (public routes)
+  app.get('/privacy-policy', async (req, res) => {
+    const fs = await import('fs/promises');
+    const markdown = await fs.readFile('privacy-policy.md', 'utf-8');
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Privacy Policy - ProdBuddy</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+          h1 { border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+          h2 { margin-top: 30px; color: #0066cc; }
+          a { color: #0066cc; }
+        </style>
+      </head>
+      <body>${markdown.replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/- (.+)$/gm, '<li>$1</li>').replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>').replace(/\n\n/g, '</p><p>').replace(/^(?!<[h|l])/gm, '<p>').replace(/<p><\/p>/g, '')}</body>
+      </html>
+    `);
+  });
+
+  app.get('/terms-of-service', async (req, res) => {
+    const fs = await import('fs/promises');
+    const markdown = await fs.readFile('terms-of-service.md', 'utf-8');
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Terms of Service - ProdBuddy</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+          h1 { border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+          h2 { margin-top: 30px; color: #0066cc; }
+          a { color: #0066cc; }
+        </style>
+      </head>
+      <body>${markdown.replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/- (.+)$/gm, '<li>$1</li>').replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>').replace(/\n\n/g, '</p><p>').replace(/^(?!<[h|l])/gm, '<p>').replace(/<p><\/p>/g, '')}</body>
+      </html>
+    `);
+  });
+
   // Get authenticated user
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

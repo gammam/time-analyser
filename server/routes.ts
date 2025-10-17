@@ -29,11 +29,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google OAuth - Initiate authentication
   app.get('/auth/google', isAuthenticated, async (req: any, res) => {
     try {
+      console.log('🔵 Google OAuth initiation requested');
       const userId = req.user.claims.sub;
+      console.log('🔵 User ID:', userId);
       
       // Generate random CSRF token and store it in session
       const crypto = await import('crypto');
       const csrfToken = crypto.randomBytes(32).toString('hex');
+      console.log('🔵 Generated CSRF token');
       
       // Store CSRF token and userId in session for validation
       if (!req.session.oauthState) {
@@ -45,9 +48,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const authUrl = getAuthUrl(csrfToken); // Pass CSRF token as state
+      console.log('🔵 Redirecting to Google OAuth URL:', authUrl);
       res.redirect(authUrl);
     } catch (error: any) {
-      console.error('Error initiating Google OAuth:', error);
+      console.error('🔴 Error initiating Google OAuth:', error);
       res.status(500).json({ error: error.message || 'Failed to initiate Google OAuth' });
     }
   });

@@ -30,7 +30,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/auth/google', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const authUrl = getAuthUrl(userId); // Pass userId as state
+      
+      // Generate random CSRF token and store it in session
+      const crypto = await import('crypto');
+      const csrfToken = crypto.randomBytes(32).toString('hex');
+      
+      // Store CSRF token and userId in session for validation
+      if (!req.session.oauthState) {
+        req.session.oauthState = {};
+      }
+      req.session.oauthState[csrfToken] = {
+        userId,
+        timestamp: Date.now(),
+      };
+      
+      const authUrl = getAuthUrl(csrfToken); // Pass CSRF token as state
       res.redirect(authUrl);
     } catch (error: any) {
       console.error('Error initiating Google OAuth:', error);
@@ -38,14 +52,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Google OAuth - Callback handler
-  app.get('/auth/google/callback', async (req: any, res) => {
+  // Google OAuth - Callback handler (protected with authentication)
+  app.get('/auth/google/callback', isAuthenticated, async (req: any, res) => {
     try {
-      const { code, state: userId } = req.query;
+      const { code, state: csrfToken } = req.query;
 
-      if (!code || !userId) {
-        throw new Error('Missing authorization code or user ID');
+      if (!code || !csrfToken) {
+        throw new Error('Missing authorization code or state token');
       }
+
+      // Validate CSRF token and get userId from session
+      const oauthState = req.session.oauthState?.[csrfToken as string];
+      const authenticatedUserId = req.user.claims.sub;
+
+      if (!oauthState) {
+        throw new Error('Invalid or expired OAuth state token');
+      }
+
+      // Verify that session userId matches authenticated user
+      if (oauthState.userId !== authenticatedUserId) {
+        throw new Error('User ID mismatch - potential CSRF attack');
+      }
+
+      // Check token is not too old (5 minutes max)
+      const tokenAge = Date.now() - oauthState.timestamp;
+      if (tokenAge > 5 * 60 * 1000) {
+        throw new Error('OAuth state token expired');
+      }
+
+      // Clean up used token
+      delete req.session.oauthState[csrfToken as string];
 
       // Exchange code for tokens
       const tokens = await getTokensFromCode(code as string);
@@ -54,8 +90,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('Failed to obtain access token');
       }
 
-      // Save tokens to database
-      await storage.upsertUserSettings(userId as string, {
+      // Save tokens to database for authenticated user only
+      await storage.upsertUserSettings(authenticatedUserId, {
         googleAccessToken: tokens.access_token,
         googleRefreshToken: tokens.refresh_token || null,
         googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,

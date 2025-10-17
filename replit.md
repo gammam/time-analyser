@@ -27,15 +27,18 @@ The backend uses **Express.js with TypeScript** and a REST API architecture. It 
 The application uses a **PostgreSQL database** via **Drizzle ORM**. Key features include upsert logic for meeting data and scores, Zod for input validation, and a schema defined for users, sessions, meetings, meetingScores, challenges, achievements, JIRA-related entities (`jiraTasks`, `dailyCapacities`, `taskPredictions`), and user settings. Migrations are managed via Drizzle.
 
 **User Settings Table:**
-- `userSettings`: Stores per-user configuration including work hours, context switching, and JIRA credentials
+- `userSettings`: Stores per-user configuration including work hours, context switching, JIRA credentials, and Google OAuth tokens
   - `dailyWorkHours` (0.5-24): Hours available for work each day
   - `contextSwitchingMinutes` (0-60): Time lost when switching between tasks
   - `jiraEmail`: User's Atlassian account email (nullable)
   - `jiraApiToken`: User's JIRA API token (nullable, never exposed in API responses)
   - `jiraHost`: User's Atlassian instance URL (nullable)
   - `jiraJqlQuery`: Custom JQL query for task filtering (nullable)
+  - `googleAccessToken`: Google OAuth access token (nullable, never exposed in API responses)
+  - `googleRefreshToken`: Google OAuth refresh token (nullable, never exposed in API responses)
+  - `googleTokenExpiry`: Token expiration timestamp (nullable)
 - Validated with Zod constraints and security transforms (empty strings converted to null)
-- API responses include `hasJiraCredentials` boolean instead of exposing the token
+- API responses include `hasJiraCredentials` and `hasGoogleCredentials` booleans instead of exposing tokens
 
 ### Authentication and Authorization
 
@@ -57,6 +60,34 @@ Advanced features include title analysis, topic counting, accountability detecti
 
 The system includes **Weekly Challenges** generated based on a user's weakest scoring criteria, with real-time progress tracking. An **Achievement System** allows users to unlock badges, track streaks, and level up.
 
+### Google Calendar OAuth Per-User Integration
+
+**Per-User OAuth Authentication**: Each user connects their own Google account via OAuth 2.0 flow:
+- **OAuth Flow**: Initiated from Settings page with "Connect Google Calendar" button
+- **Scopes**: Google Calendar (readonly), Google Docs (readonly), User email
+- **Token Management**: Access tokens auto-refresh using refresh tokens when expired
+- **CSRF Protection**: Random CSRF tokens stored in session, validated on callback
+- **Security**: Callback route protected with authentication middleware
+
+**OAuth Configuration** (Environment Variables):
+- `GOOGLE_CLIENT_ID`: OAuth client ID from Google Cloud Console
+- `GOOGLE_CLIENT_SECRET`: OAuth client secret from Google Cloud Console
+- Redirect URI: `https://<domain>/auth/google/callback`
+
+**Security Features**:
+- Tokens stored per-user in database, never exposed in API responses
+- GET `/api/settings` returns `hasGoogleCredentials` boolean only
+- CSRF token validation prevents cross-account credential hijacking
+- OAuth state tokens expire after 5 minutes
+- Session-based authentication required for all OAuth routes
+
+**User Flow**:
+1. User clicks "Connect Google Calendar" in Settings
+2. Redirects to Google OAuth consent screen
+3. User authorizes access to Calendar and Docs
+4. Callback validates CSRF token and saves tokens to user's record
+5. Each user sees only their own calendar data
+
 ### JIRA Integration Configuration
 
 **Per-User Credentials**: Each user can configure their own JIRA credentials in the Settings page:
@@ -77,10 +108,10 @@ The system includes **Weekly Challenges** generated based on a user's weakest sc
 
 ### Third-Party Services
 
-*   **Google Calendar API**: For syncing meeting events.
-*   **Google Docs API**: For analyzing meeting notes.
-*   **Replit Connectors**: Manages OAuth credentials and token refresh for Google and Atlassian services.
-*   **JIRA (Atlassian)**: For syncing and analyzing user tasks.
+*   **Google Calendar API**: Per-user OAuth integration for syncing meeting events.
+*   **Google Docs API**: Per-user OAuth integration for analyzing meeting notes.
+*   **Google OAuth 2.0**: Secure per-user authentication with automatic token refresh.
+*   **JIRA (Atlassian)**: Per-user API token integration for syncing and analyzing tasks.
 
 ### Key NPM Packages
 

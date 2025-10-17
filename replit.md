@@ -27,8 +27,15 @@ The backend uses **Express.js with TypeScript** and a REST API architecture. It 
 The application uses a **PostgreSQL database** via **Drizzle ORM**. Key features include upsert logic for meeting data and scores, Zod for input validation, and a schema defined for users, sessions, meetings, meetingScores, challenges, achievements, JIRA-related entities (`jiraTasks`, `dailyCapacities`, `taskPredictions`), and user settings. Migrations are managed via Drizzle.
 
 **User Settings Table:**
-- `userSettings`: Stores per-user configuration (dailyWorkHours, contextSwitchingMinutes)
-- Validated with Zod constraints: dailyWorkHours (0.5-24), contextSwitchingMinutes (0-60 int)
+- `userSettings`: Stores per-user configuration including work hours, context switching, and JIRA credentials
+  - `dailyWorkHours` (0.5-24): Hours available for work each day
+  - `contextSwitchingMinutes` (0-60): Time lost when switching between tasks
+  - `jiraEmail`: User's Atlassian account email (nullable)
+  - `jiraApiToken`: User's JIRA API token (nullable, never exposed in API responses)
+  - `jiraHost`: User's Atlassian instance URL (nullable)
+  - `jiraJqlQuery`: Custom JQL query for task filtering (nullable)
+- Validated with Zod constraints and security transforms (empty strings converted to null)
+- API responses include `hasJiraCredentials` boolean instead of exposing the token
 
 ### Authentication and Authorization
 
@@ -49,6 +56,22 @@ Advanced features include title analysis, topic counting, accountability detecti
 ### Gamification System
 
 The system includes **Weekly Challenges** generated based on a user's weakest scoring criteria, with real-time progress tracking. An **Achievement System** allows users to unlock badges, track streaks, and level up.
+
+### JIRA Integration Configuration
+
+**Per-User Credentials**: Each user can configure their own JIRA credentials in the Settings page:
+- **Atlassian Email**: User's JIRA account email
+- **Atlassian URL**: User's JIRA instance URL (e.g., https://company.atlassian.net)
+- **API Token**: Personal API token from Atlassian (securely stored, never exposed)
+- **JQL Query**: Custom query to filter which tasks to sync (optional)
+
+**Fallback Behavior**: If user credentials are not configured, the system falls back to environment variables (`JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_HOST`, `JIRA_JQL_QUERY`) for backward compatibility.
+
+**Security Features**:
+- API tokens are stored in database but never returned in API responses
+- GET `/api/settings` returns `hasJiraCredentials` boolean instead of the token
+- Password input field clears after save for additional security
+- Empty strings are converted to null, allowing users to clear credentials and revert to env-based defaults
 
 ## External Dependencies
 

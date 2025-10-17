@@ -268,12 +268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getUncachableJiraClient } = await import('./jira-client');
       const jira = await getUncachableJiraClient();
       
-      // Search for recent issues (not filtering by user since system account doesn't have "myself")
-      // This will sync all accessible tasks from the JIRA instance
+      // Search for recent issues using only standard JIRA fields
       const searchResults = await jira.issueSearch.searchForIssuesUsingJql({
         jql: `status != Done ORDER BY updated DESC`,
         maxResults: 50, // Limit to recent 50 tasks
-        fields: ['summary', 'description', 'status', 'priority', 'duedate', 'assignee', 'project', 'labels', 'timeestimate', 'customfield_10016'] // customfield_10016 is usually story points
+        fields: ['summary', 'status', 'priority', 'assignee', 'project', 'updated'] // Only standard fields
       });
       
       const issues = searchResults.issues || [];
@@ -282,26 +281,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const issue of issues) {
         const fields = issue.fields as any;
         
-        // Convert time estimate from seconds to hours
-        const estimateHours = fields.timeestimate ? fields.timeestimate / 3600 : null;
-        
-        // Get story points (might be in different custom fields depending on Jira setup)
-        const storyPoints = fields.customfield_10016 || null;
-        
         const taskData = {
           userId,
           jiraKey: issue.key || '',
           jiraId: issue.id || '',
           summary: fields.summary || '',
-          description: fields.description || '',
+          description: '', // Not fetched to avoid field errors
           status: fields.status?.name || 'To Do',
           priority: fields.priority?.name || 'Medium',
-          estimateHours,
-          storyPoints,
-          dueDate: fields.duedate ? new Date(fields.duedate) : null,
+          estimateHours: null, // Not fetched to avoid field errors
+          storyPoints: null, // Not fetched to avoid field errors
+          dueDate: null, // Not fetched to avoid field errors
           assignee: fields.assignee?.displayName || 'Unassigned',
           projectKey: fields.project?.key || '',
-          labels: fields.labels || []
+          labels: [] // Not fetched to avoid field errors
         };
         
         const task = await storage.upsertJiraTask(taskData);

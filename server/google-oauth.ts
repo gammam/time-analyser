@@ -3,7 +3,7 @@ import type { OAuth2Client } from 'google-auth-library';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN}/auth/google/callback`;
+const REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI || `https://${process.env.REPLIT_DEV_DOMAIN}/auth/google/callback`;
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',

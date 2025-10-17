@@ -132,7 +132,7 @@ export default function TaskAnalysis() {
           </div>
         ) : (
           <>
-            {predictions && (
+            {predictions && predictions.summary && (
               <>
                 <div className="grid gap-6 md:grid-cols-4">
                   <Card data-testid="card-total-tasks">

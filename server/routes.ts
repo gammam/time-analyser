@@ -291,7 +291,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         body: JSON.stringify({
           jql: 'status in ("To Do", "In Progress")',
-          maxResults: 50
+          maxResults: 50,
+          fields: ['summary', 'status', 'priority', 'assignee', 'project', 'timeestimate']
         })
       });
       
@@ -302,28 +303,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const data = await response.json();
-      const issues = data.issues || [];
+      const issues = data.values || [];
       
       console.log(`Found ${issues.length} JIRA issues`);
+      if (issues.length > 0) {
+        console.log('First issue sample:', JSON.stringify(issues[0], null, 2));
+      }
       
       const syncedTasks = [];
       
       for (const issue of issues) {
-        const fields = issue.fields as any;
-        
         const taskData = {
           userId,
           jiraKey: issue.key || '',
           jiraId: issue.id || '',
-          summary: fields.summary || '',
+          summary: issue.summary || '',
           description: '', 
-          status: fields.status?.name || 'To Do',
-          priority: fields.priority?.name || 'Medium',
-          estimateHours: null,
+          status: issue.status || 'To Do',
+          priority: issue.priority || 'Medium',
+          estimateHours: issue.timeestimate ? issue.timeestimate / 3600 : null,
           storyPoints: null,
           dueDate: null,
-          assignee: fields.assignee?.displayName || 'Unassigned',
-          projectKey: fields.project?.key || '',
+          assignee: issue.assignee || 'Unassigned',
+          projectKey: issue.project || '',
           labels: []
         };
         

@@ -274,21 +274,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('JIRA credentials not configured');
       }
 
-      // Use direct REST API call instead of jira.js library
+      // Use direct REST API call with new v3 endpoint
       const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
       
-      // Simple JQL query to get all open issues
-      const jqlQuery = 'status in ("To Do", "In Progress")';
-      const url = `${host}/rest/api/3/search?jql=${encodeURIComponent(jqlQuery)}&maxResults=50`;
+      // Use the new /rest/api/3/search/jql endpoint
+      const url = `${host}/rest/api/3/search/jql`;
       
       console.log('Calling JIRA API:', url);
       
       const response = await fetch(url, {
+        method: 'POST',
         headers: {
           'Authorization': `Basic ${auth}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          jql: 'status in ("To Do", "In Progress")',
+          maxResults: 50
+        })
       });
       
       if (!response.ok) {

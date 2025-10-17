@@ -83,16 +83,15 @@ export default function Settings() {
   });
 
   const handleSave = () => {
-    const data: any = {
+    // Always include JIRA fields to allow clearing them (empty string will be converted to null by backend)
+    const data = {
       dailyWorkHours,
-      contextSwitchingMinutes
+      contextSwitchingMinutes,
+      jiraEmail: jiraEmail || "",
+      jiraApiToken: jiraApiToken || "",
+      jiraHost: jiraHost || "",
+      jiraJqlQuery: jiraJqlQuery || "",
     };
-    
-    // Only include JIRA fields if they have values
-    if (jiraEmail) data.jiraEmail = jiraEmail;
-    if (jiraApiToken) data.jiraApiToken = jiraApiToken;
-    if (jiraHost) data.jiraHost = jiraHost;
-    if (jiraJqlQuery) data.jiraJqlQuery = jiraJqlQuery;
     
     saveSettingsMutation.mutate(data);
   };

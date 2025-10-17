@@ -186,10 +186,10 @@ export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
 export const updateUserSettingsSchema = insertUserSettingsSchema.partial().extend({
   dailyWorkHours: z.number().min(0.5, "Daily work hours must be at least 0.5").max(24, "Daily work hours cannot exceed 24").optional(),
   contextSwitchingMinutes: z.number().int("Context switching must be a whole number").min(0, "Context switching cannot be negative").max(60, "Context switching cannot exceed 60 minutes").optional(),
-  jiraEmail: z.string().email("Invalid email format").optional().or(z.literal("")),
-  jiraApiToken: z.string().min(1, "API token cannot be empty").optional().or(z.literal("")),
-  jiraHost: z.string().url("Invalid URL format").optional().or(z.literal("")),
-  jiraJqlQuery: z.string().optional().or(z.literal("")),
+  jiraEmail: z.string().email("Invalid email format").optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  jiraApiToken: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  jiraHost: z.string().url("Invalid URL format").optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  jiraJqlQuery: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
 });
 
 // Safe schema for GET requests - excludes sensitive jiraApiToken

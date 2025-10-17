@@ -505,16 +505,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user settings
+  // Get user settings (excluding sensitive jiraApiToken)
   app.get("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
       const settings = await storage.getUserSettings(userId);
       
+      // Return safe response without exposing jiraApiToken
       res.json({
+        id: settings?.id || '',
+        userId: settings?.userId || userId,
         dailyWorkHours: settings?.dailyWorkHours || 8,
-        contextSwitchingMinutes: settings?.contextSwitchingMinutes || 20
+        contextSwitchingMinutes: settings?.contextSwitchingMinutes || 20,
+        jiraEmail: settings?.jiraEmail || null,
+        jiraHost: settings?.jiraHost || null,
+        jiraJqlQuery: settings?.jiraJqlQuery || null,
+        hasJiraCredentials: !!(settings?.jiraApiToken),
+        updatedAt: settings?.updatedAt || null,
       });
     } catch (error: any) {
       console.error('Error fetching settings:', error);
@@ -531,7 +539,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const settings = await storage.upsertUserSettings(userId, validated);
       
-      res.json(settings);
+      // Return safe response without exposing jiraApiToken
+      res.json({
+        id: settings.id,
+        userId: settings.userId,
+        dailyWorkHours: settings.dailyWorkHours,
+        contextSwitchingMinutes: settings.contextSwitchingMinutes,
+        jiraEmail: settings.jiraEmail || null,
+        jiraHost: settings.jiraHost || null,
+        jiraJqlQuery: settings.jiraJqlQuery || null,
+        hasJiraCredentials: !!(settings.jiraApiToken),
+        updatedAt: settings.updatedAt,
+      });
     } catch (error: any) {
       console.error('Error updating settings:', error);
       if (error.name === 'ZodError') {

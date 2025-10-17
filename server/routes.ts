@@ -266,13 +266,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
-      const email = process.env.JIRA_EMAIL;
-      const apiToken = process.env.JIRA_API_TOKEN;
-      const host = process.env.JIRA_HOST || 'https://pagopa.atlassian.net';
-      const jqlQuery = process.env.JIRA_JQL_QUERY || 'status in ("To Do", "In Progress")';
+      // Get user settings to retrieve JIRA credentials
+      const userSettings = await storage.getUserSettings(userId);
+      
+      // Use user credentials if available, otherwise fall back to env variables
+      const email = userSettings?.jiraEmail || process.env.JIRA_EMAIL;
+      const apiToken = userSettings?.jiraApiToken || process.env.JIRA_API_TOKEN;
+      const host = userSettings?.jiraHost || process.env.JIRA_HOST || 'https://pagopa.atlassian.net';
+      const jqlQuery = userSettings?.jiraJqlQuery || process.env.JIRA_JQL_QUERY || 'status in ("To Do", "In Progress")';
       
       if (!email || !apiToken) {
-        throw new Error('JIRA credentials not configured');
+        throw new Error('JIRA credentials not configured. Please configure your JIRA settings.');
       }
 
       // Use direct REST API call with new v3 endpoint

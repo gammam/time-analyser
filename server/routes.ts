@@ -265,17 +265,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/jira/sync", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { getUncachableJiraClient } = await import('./jira-client');
-      const jira = await getUncachableJiraClient();
       
-      // Search for recent issues using only standard JIRA fields
-      const searchResults = await jira.issueSearch.searchForIssuesUsingJql({
-        jql: `status != Done ORDER BY updated DESC`,
-        maxResults: 50, // Limit to recent 50 tasks
-        fields: ['summary', 'status', 'priority', 'assignee', 'project', 'updated'] // Only standard fields
+      const email = process.env.JIRA_EMAIL;
+      const apiToken = process.env.JIRA_API_TOKEN;
+      const host = process.env.JIRA_HOST || 'https://pagopa.atlassian.net';
+      
+      if (!email || !apiToken) {
+        throw new Error('JIRA credentials not configured');
+      }
+
+      // Use direct REST API call instead of jira.js library
+      const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+      
+      // Simple JQL query to get all open issues
+      const jqlQuery = 'status in ("To Do", "In Progress")';
+      const url = `${host}/rest/api/3/search?jql=${encodeURIComponent(jqlQuery)}&maxResults=50`;
+      
+      console.log('Calling JIRA API:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
       
-      const issues = searchResults.issues || [];
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('JIRA API Error:', response.status, errorText);
+        throw new Error(`JIRA API returned ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      const issues = data.issues || [];
+      
+      console.log(`Found ${issues.length} JIRA issues`);
+      
       const syncedTasks = [];
       
       for (const issue of issues) {
@@ -286,15 +312,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           jiraKey: issue.key || '',
           jiraId: issue.id || '',
           summary: fields.summary || '',
-          description: '', // Not fetched to avoid field errors
+          description: '', 
           status: fields.status?.name || 'To Do',
           priority: fields.priority?.name || 'Medium',
-          estimateHours: null, // Not fetched to avoid field errors
-          storyPoints: null, // Not fetched to avoid field errors
-          dueDate: null, // Not fetched to avoid field errors
+          estimateHours: null,
+          storyPoints: null,
+          dueDate: null,
           assignee: fields.assignee?.displayName || 'Unassigned',
           projectKey: fields.project?.key || '',
-          labels: [] // Not fetched to avoid field errors
+          labels: []
         };
         
         const task = await storage.upsertJiraTask(taskData);

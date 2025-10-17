@@ -305,7 +305,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const data = await response.json();
-      const issues = data.values || [];
+      
+      // Log the complete response to debug
+      console.log('JIRA API Response:', JSON.stringify(data, null, 2));
+      
+      const issues = data.values || data.issues || [];
       
       console.log(`Found ${issues.length} JIRA issues`);
       if (issues.length > 0) {

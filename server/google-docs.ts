@@ -1,43 +1,38 @@
 import { google } from 'googleapis';
+import { storage } from './storage';
+import { refreshAccessToken } from './google-oauth';
 
-let connectionSettings: any;
+export async function getGoogleDocsClient(userId: string) {
+  // Get user settings with Google tokens
+  const settings = await storage.getUserSettings(userId);
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  if (!settings?.googleAccessToken) {
+    throw new Error('Google Docs not connected. Please connect your Google account in Settings.');
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-docs',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
+  // Check if token is expired
+  const now = new Date();
+  const isExpired = settings.googleTokenExpiry && new Date(settings.googleTokenExpiry) <= now;
+
+  let accessToken = settings.googleAccessToken;
+
+  // Refresh token if expired
+  if (isExpired && settings.googleRefreshToken) {
+    try {
+      const newTokens = await refreshAccessToken(settings.googleRefreshToken);
+      
+      // Update tokens in database
+      await storage.upsertUserSettings(userId, {
+        googleAccessToken: newTokens.access_token || settings.googleAccessToken,
+        googleTokenExpiry: newTokens.expiry_date ? new Date(newTokens.expiry_date) : settings.googleTokenExpiry,
+      });
+
+      accessToken = newTokens.access_token || settings.googleAccessToken;
+    } catch (error) {
+      console.error('Error refreshing Google token:', error);
+      throw new Error('Google token expired and refresh failed. Please reconnect your Google account in Settings.');
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Google Docs not connected');
   }
-  return accessToken;
-}
-
-export async function getUncachableGoogleDocsClient() {
-  const accessToken = await getAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
@@ -45,4 +40,9 @@ export async function getUncachableGoogleDocsClient() {
   });
 
   return google.docs({ version: 'v1', auth: oauth2Client });
+}
+
+// Legacy function - kept for backward compatibility but will throw error
+export async function getUncachableGoogleDocsClient() {
+  throw new Error('This function is deprecated. Use getGoogleDocsClient(userId) instead.');
 }

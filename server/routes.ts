@@ -1,12 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { getUncachableGoogleCalendarClient } from "./google-calendar";
-import { getUncachableGoogleDocsClient } from "./google-docs";
+import { getGoogleCalendarClient } from "./google-calendar";
+import { getGoogleDocsClient } from "./google-docs";
 import { calculateMeetingScore, extractAgendaFromDescription, extractKeywordsFromNotes } from "./scoring";
 import { insertMeetingSchema, insertMeetingScoreSchema, updateUserSettingsSchema } from "@shared/schema";
 import { generateWeeklyChallenge, updateChallengeProgress } from "./gamification";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { getAuthUrl, getTokensFromCode } from "./google-oauth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -25,13 +26,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Google OAuth - Initiate authentication
+  app.get('/auth/google', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const authUrl = getAuthUrl(userId); // Pass userId as state
+      res.redirect(authUrl);
+    } catch (error: any) {
+      console.error('Error initiating Google OAuth:', error);
+      res.status(500).json({ error: error.message || 'Failed to initiate Google OAuth' });
+    }
+  });
+
+  // Google OAuth - Callback handler
+  app.get('/auth/google/callback', async (req: any, res) => {
+    try {
+      const { code, state: userId } = req.query;
+
+      if (!code || !userId) {
+        throw new Error('Missing authorization code or user ID');
+      }
+
+      // Exchange code for tokens
+      const tokens = await getTokensFromCode(code as string);
+
+      if (!tokens.access_token) {
+        throw new Error('Failed to obtain access token');
+      }
+
+      // Save tokens to database
+      await storage.upsertUserSettings(userId as string, {
+        googleAccessToken: tokens.access_token,
+        googleRefreshToken: tokens.refresh_token || null,
+        googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      });
+
+      // Redirect back to settings page with success message
+      res.redirect('/settings?google_connected=true');
+    } catch (error: any) {
+      console.error('Error in Google OAuth callback:', error);
+      res.redirect('/settings?google_error=' + encodeURIComponent(error.message || 'OAuth failed'));
+    }
+  });
+
+  // Disconnect Google account
+  app.post('/api/auth/google/disconnect', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Clear Google tokens from database
+      await storage.upsertUserSettings(userId, {
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        googleTokenExpiry: null,
+      });
+
+      res.json({ success: true, message: 'Google account disconnected' });
+    } catch (error: any) {
+      console.error('Error disconnecting Google account:', error);
+      res.status(500).json({ error: error.message || 'Failed to disconnect Google account' });
+    }
+  });
+
   // Sync meetings from Google Calendar
   app.post("/api/meetings/sync", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { timeMin, timeMax } = req.body;
 
-      const calendar = await getUncachableGoogleCalendarClient();
+      const calendar = await getGoogleCalendarClient(userId);
       const response = await calendar.events.list({
         calendarId: 'primary',
         timeMin: timeMin || new Date().toISOString(),
@@ -148,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateMeeting(id, { googleDocId });
 
       // Fetch and analyze the doc
-      const docs = await getUncachableGoogleDocsClient();
+      const docs = await getGoogleDocsClient(meeting.userId);
       const doc = await docs.documents.get({ documentId: googleDocId });
 
       const content = extractTextFromDoc(doc.data);
@@ -516,7 +579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const settings = await storage.getUserSettings(userId);
       
-      // Return safe response without exposing jiraApiToken
+      // Return safe response without exposing sensitive tokens (jiraApiToken, googleAccessToken, googleRefreshToken)
       res.json({
         id: settings?.id || '',
         userId: settings?.userId || userId,
@@ -526,6 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jiraHost: settings?.jiraHost || null,
         jiraJqlQuery: settings?.jiraJqlQuery || null,
         hasJiraCredentials: !!(settings?.jiraApiToken),
+        hasGoogleCredentials: !!(settings?.googleAccessToken),
         updatedAt: settings?.updatedAt || null,
       });
     } catch (error: any) {
@@ -543,7 +607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const settings = await storage.upsertUserSettings(userId, validated);
       
-      // Return safe response without exposing jiraApiToken
+      // Return safe response without exposing sensitive tokens (jiraApiToken, googleAccessToken, googleRefreshToken)
       res.json({
         id: settings.id,
         userId: settings.userId,
@@ -553,6 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jiraHost: settings.jiraHost || null,
         jiraJqlQuery: settings.jiraJqlQuery || null,
         hasJiraCredentials: !!(settings.jiraApiToken),
+        hasGoogleCredentials: !!(settings.googleAccessToken),
         updatedAt: settings.updatedAt,
       });
     } catch (error: any) {

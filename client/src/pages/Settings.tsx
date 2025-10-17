@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings as SettingsIcon, Save, Key } from "lucide-react";
+import { Settings as SettingsIcon, Save, Key, Calendar, CheckCircle2, XCircle } from "lucide-react";
 
 interface SettingsData {
   dailyWorkHours: number;
@@ -17,6 +17,7 @@ interface SettingsData {
   jiraHost: string | null;
   jiraJqlQuery: string | null;
   hasJiraCredentials: boolean;
+  hasGoogleCredentials: boolean;
 }
 
 export default function Settings() {
@@ -53,6 +54,32 @@ export default function Settings() {
     }
   }, [error, toast]);
 
+  // Handle OAuth callback messages
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleConnected = params.get('google_connected');
+    const googleError = params.get('google_error');
+
+    if (googleConnected === 'true') {
+      toast({
+        title: "Google Calendar Connected",
+        description: "Your Google account has been successfully linked.",
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings');
+      // Refresh settings
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+    } else if (googleError) {
+      toast({
+        title: "Connection Failed",
+        description: decodeURIComponent(googleError),
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings');
+    }
+  }, [toast]);
+
   const saveSettingsMutation = useMutation({
     mutationFn: async (data: { 
       dailyWorkHours: number; 
@@ -82,6 +109,26 @@ export default function Settings() {
     },
   });
 
+  const disconnectGoogleMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/auth/google/disconnect', {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings'] });
+      toast({
+        title: "Google Account Disconnected",
+        description: "Your Google Calendar connection has been removed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Disconnect Failed",
+        description: error.message || "Failed to disconnect Google account",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSave = () => {
     // Always include JIRA fields to allow clearing them (empty string will be converted to null by backend)
     const data = {
@@ -94,6 +141,14 @@ export default function Settings() {
     };
     
     saveSettingsMutation.mutate(data);
+  };
+
+  const handleConnectGoogle = () => {
+    window.location.href = '/auth/google';
+  };
+
+  const handleDisconnectGoogle = () => {
+    disconnectGoogleMutation.mutate();
   };
 
   return (
@@ -236,6 +291,68 @@ export default function Settings() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Google Calendar Integration
+            </CardTitle>
+            <CardDescription>
+              Connect your Google account to sync meetings and analyze productivity
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                {settings?.hasGoogleCredentials ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <div>
+                      <p className="font-medium" data-testid="text-google-status">Connected</p>
+                      <p className="text-sm text-muted-foreground">
+                        Your Google Calendar is linked and ready to sync
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium" data-testid="text-google-status">Not Connected</p>
+                      <p className="text-sm text-muted-foreground">
+                        Connect your Google account to start analyzing meetings
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div>
+                {settings?.hasGoogleCredentials ? (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDisconnectGoogle}
+                    disabled={disconnectGoogleMutation.isPending || isLoading}
+                    data-testid="button-disconnect-google"
+                  >
+                    {disconnectGoogleMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleConnectGoogle}
+                    disabled={isLoading}
+                    data-testid="button-connect-google"
+                  >
+                    Connect Google Calendar
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              We'll only access your calendar events and meeting notes. Your data stays private and secure.
+            </p>
           </CardContent>
         </Card>
 

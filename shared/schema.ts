@@ -134,6 +134,9 @@ export const userSettings = pgTable("user_settings", {
   jiraApiToken: text("jira_api_token"),
   jiraHost: text("jira_host"),
   jiraJqlQuery: text("jira_jql_query"),
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+  googleTokenExpiry: timestamp("google_token_expiry"),
   updatedAt: timestamp("updated_at").default(sql`now()`),
 });
 
@@ -190,9 +193,12 @@ export const updateUserSettingsSchema = insertUserSettingsSchema.partial().exten
   jiraApiToken: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
   jiraHost: z.string().url("Invalid URL format").optional().or(z.literal("")).transform(val => val === "" ? null : val),
   jiraJqlQuery: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  googleAccessToken: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  googleRefreshToken: z.string().optional().or(z.literal("")).transform(val => val === "" ? null : val),
+  googleTokenExpiry: z.date().optional().nullable(),
 });
 
-// Safe schema for GET requests - excludes sensitive jiraApiToken
+// Safe schema for GET requests - excludes sensitive tokens (jiraApiToken, googleAccessToken, googleRefreshToken)
 export const userSettingsResponseSchema = z.object({
   id: z.string(),
   userId: z.string(),
@@ -202,6 +208,7 @@ export const userSettingsResponseSchema = z.object({
   jiraHost: z.string().nullable(),
   jiraJqlQuery: z.string().nullable(),
   hasJiraCredentials: z.boolean(), // Indicates if jiraApiToken is configured
+  hasGoogleCredentials: z.boolean(), // Indicates if Google OAuth tokens are configured
   updatedAt: z.date().nullable(),
 });
 

@@ -62,10 +62,7 @@ export default function Settings() {
       jiraHost?: string;
       jiraJqlQuery?: string;
     }) => {
-      return await apiRequest('/api/settings', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return await apiRequest('POST', '/api/settings', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings'] });

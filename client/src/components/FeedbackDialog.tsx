@@ -13,6 +13,8 @@ interface FeedbackDialogProps {
 }
 
 export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
+  const tallyFormId = import.meta.env.VITE_TALLY_FORM_ID || "YOUR_FORM_ID";
+
   useEffect(() => {
     if (!open) return;
 
@@ -66,7 +68,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
         </DialogHeader>
         <div className="mt-4">
           <iframe
-            data-tally-src="https://tally.so/r/YOUR_FORM_ID?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
+            data-tally-src={`https://tally.so/r/${tallyFormId}?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1`}
             loading="lazy"
             width="100%"
             height="500"

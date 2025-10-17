@@ -154,6 +154,7 @@ The system includes **Weekly Challenges** generated based on a user's weakest sc
 - Iframe configured with optimal parameters: `transparentBackground`, `dynamicHeight`, `alignLeft`, `hideTitle`
 - Event listener for `Tally.FormSubmitted` event to auto-close dialog
 - Responsive modal with scroll support for mobile devices
+- Form ID configured via `VITE_TALLY_FORM_ID` environment variable (frontend secret)
 
 ## External Dependencies
 

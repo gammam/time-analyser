@@ -83,17 +83,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const csrfToken = crypto.randomBytes(32).toString('hex');
       console.log('🔵 Generated CSRF token');
       
-      // Store CSRF token and userId in session for validation
+      // Capture the origin URL to redirect back after OAuth
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers['host'];
+      const returnUrl = `${protocol}://${host}/settings`;
+      
+      // Store CSRF token, userId, and return URL in session for validation
       if (!req.session.oauthState) {
         req.session.oauthState = {};
       }
       req.session.oauthState[csrfToken] = {
         userId,
         timestamp: Date.now(),
+        returnUrl,
       };
       
       const authUrl = getAuthUrl(csrfToken); // Pass CSRF token as state
       console.log('🔵 Redirecting to Google OAuth URL:', authUrl);
+      console.log('🔵 Will return to:', returnUrl);
       res.redirect(authUrl);
     } catch (error: any) {
       console.error('🔴 Error initiating Google OAuth:', error);
@@ -146,11 +153,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
       });
 
-      // Redirect back to settings page with success message
-      res.redirect('/settings?google_connected=true');
+      // Get the return URL from session state
+      const returnUrl = oauthState.returnUrl || '/settings';
+      console.log('🔵 OAuth success, redirecting to:', returnUrl);
+      
+      // Redirect back to the original domain's settings page with success message
+      res.redirect(`${returnUrl}?google_connected=true`);
     } catch (error: any) {
-      console.error('Error in Google OAuth callback:', error);
-      res.redirect('/settings?google_error=' + encodeURIComponent(error.message || 'OAuth failed'));
+      console.error('🔴 Error in Google OAuth callback:', error);
+      
+      // Try to get returnUrl from session, fallback to relative path
+      const returnUrl = req.session.oauthState?.[req.query.state as string]?.returnUrl || '/settings';
+      res.redirect(`${returnUrl}?google_error=${encodeURIComponent(error.message || 'OAuth failed')}`);
     }
   });
 

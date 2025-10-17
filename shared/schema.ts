@@ -121,7 +121,9 @@ export const taskCompletionPredictions = pgTable("task_completion_predictions", 
   estimatedCompletionDate: timestamp("estimated_completion_date"),
   blockers: text("blockers").array().default(sql`ARRAY[]::text[]`),
   calculatedAt: timestamp("calculated_at").default(sql`now()`),
-});
+}, (table) => [
+  uniqueIndex("idx_task_predictions_task_week").on(table.taskId, table.weekStartDate),
+]);
 
 // Upsert schema for Replit Auth
 // Reference: blueprint:javascript_log_in_with_replit

@@ -269,6 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const email = process.env.JIRA_EMAIL;
       const apiToken = process.env.JIRA_API_TOKEN;
       const host = process.env.JIRA_HOST || 'https://pagopa.atlassian.net';
+      const jqlQuery = process.env.JIRA_JQL_QUERY || 'status in ("To Do", "In Progress")';
       
       if (!email || !apiToken) {
         throw new Error('JIRA credentials not configured');
@@ -281,6 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const url = `${host}/rest/api/3/search/jql`;
       
       console.log('Calling JIRA API:', url);
+      console.log('Using JQL query:', jqlQuery);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -290,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          jql: 'status in ("To Do", "In Progress")',
+          jql: jqlQuery,
           maxResults: 50,
           fields: ['summary', 'status', 'priority', 'assignee', 'project', 'timeestimate']
         })

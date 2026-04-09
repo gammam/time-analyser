@@ -135,6 +135,7 @@ export const userSettings = pgTable("user_settings", {
   jiraApiToken: text("jira_api_token"),
   jiraHost: text("jira_host"),
   jiraJqlQuery: text("jira_jql_query"),
+  jiraEncryptionKey: text("jira_encryption_key"), // 32-char per-user encryption key
   googleAccessToken: text("google_access_token"),
   googleRefreshToken: text("google_refresh_token"),
   googleTokenExpiry: timestamp("google_token_expiry"),

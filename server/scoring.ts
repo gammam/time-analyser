@@ -1,4 +1,4 @@
-import type { Meeting } from "@shared/schema";
+import type { Meeting } from "../shared/schema.ts";
 
 interface ScoringFactors {
   title: string;

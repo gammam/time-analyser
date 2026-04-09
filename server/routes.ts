@@ -6,8 +6,10 @@ import { getGoogleDocsClient } from "./google-docs";
 import { calculateMeetingScore, extractAgendaFromDescription, extractKeywordsFromNotes } from "./scoring";
 import { insertMeetingSchema, insertMeetingScoreSchema, updateUserSettingsSchema } from "@shared/schema";
 import { generateWeeklyChallenge, updateChallengeProgress } from "./gamification";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isLocalAuthBypassed, getLocalDevUser } from "./replitAuth";
 import { getAuthUrl, getTokensFromCode } from "./google-oauth";
+import jwt from 'jsonwebtoken';
+import { encryptJiraToken, decryptJiraToken } from "./jira-crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -749,6 +751,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ error: error.message || 'Failed to update settings' });
       }
+    }
+  });
+
+  // Dev-only: login che genera un JWT valido per l'utente di test locale
+  if (process.env.NODE_ENV === 'development' || process.env.DEV_LOGIN === '1') {
+    app.post('/api/auth/dev-login', async (req: any, res: any) => {
+      const userId = req.body?.userId || 'local-dev-user';
+      const email = req.body?.email || 'local@example.com';
+      const secret = process.env.SESSION_SECRET || 'dev-secret';
+      const expiresIn = req.body?.expiresIn || '7d';
+      const payload = {
+        sub: userId,
+        email,
+        name: 'Local Dev',
+        iat: Math.floor(Date.now() / 1000),
+      };
+      const token = jwt.sign(payload, secret, { expiresIn });
+      res.json({ token, user: payload });
+    });
+  }
+
+  // DORA: Deployment Frequency
+  app.get('/api/dora/deployment-frequency', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projectKey = typeof req.query.projectKey === 'string' ? req.query.projectKey : undefined;
+      const team = typeof req.query.team === 'string' ? req.query.team : undefined;
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      if (!projectKey) {
+        return res.status(400).json({ error: 'Missing or invalid projectKey' });
+      }
+      let fromDate: Date | undefined;
+      let toDate: Date | undefined;
+      if (from) {
+        const d = new Date(from);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid from date' });
+        fromDate = d;
+      }
+      if (to) {
+        const d = new Date(to);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid to date' });
+        toDate = d;
+      }
+      const { fetchProjectVersionsRaw } = await import('./jira-client');
+      const versions = await fetchProjectVersionsRaw(userId, projectKey);
+      const versionList = Array.isArray(versions)
+        ? versions
+        : (Array.isArray((versions as any)?.values) ? (versions as any).values : []);
+      const filtered = versionList.filter((v: any) => {
+        if (!v.released || !v.releaseDate) return false;
+        const relDate = new Date(v.releaseDate);
+        if (isNaN(relDate.getTime())) return false;
+        if (fromDate && relDate < fromDate) return false;
+        if (toDate && relDate > toDate) return false;
+        return true;
+      });
+      res.json({
+        team: team || null,
+        projectKey,
+        from: fromDate ? fromDate.toISOString().slice(0, 10) : null,
+        to: toDate ? toDate.toISOString().slice(0, 10) : null,
+        deploymentFrequency: filtered.length,
+      });
+    } catch (err: any) {
+      if (err && err.type && err.message) {
+        res.status(err.type === 'auth' ? 401 : err.type === 'not_found' ? 404 : 500).json({
+          error: err.message, type: err.type, details: err.details
+        });
+      } else {
+        res.status(500).json({ error: err?.message || 'Failed to fetch deployment frequency' });
+      }
+    }
+  });
+
+  // DORA: Lead Time for Changes (Epic)
+  app.get('/api/dora/lead-time-epic', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projectKey = typeof req.query.projectKey === 'string' ? req.query.projectKey : undefined;
+      const team = typeof req.query.team === 'string' ? req.query.team : undefined;
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      if (!projectKey) {
+        return res.status(400).json({ error: 'Missing or invalid projectKey' });
+      }
+      let fromDate: Date | undefined;
+      let toDate: Date | undefined;
+      if (from) {
+        const d = new Date(from);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid from date' });
+        fromDate = d;
+      }
+      if (to) {
+        const d = new Date(to);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid to date' });
+        toDate = d;
+      }
+      const { fetchEpicsWithChangelog } = await import('./jira-client');
+      let epics: any[] = [];
+      try {
+        const result = await fetchEpicsWithChangelog(userId, projectKey, team, from, to);
+        epics = Array.isArray(result) ? result : [];
+      } catch (err: any) {
+        if (err && err.type && err.message) {
+          return res.status(err.type === 'auth' ? 401 : err.type === 'not_found' ? 404 : 500).json({
+            error: err.message, type: err.type, details: err.details
+          });
+        }
+        return res.status(500).json({ error: err?.message || 'Unknown error' });
+      }
+      let sumLeadTime = 0, countLeadTime = 0;
+      let sumLeadTimeReadyForUAT = 0, countLeadTimeReadyForUAT = 0;
+      const outputEpics: any[] = [];
+      const skippedEpics: any[] = [];
+      for (const e of epics) {
+        const created = e.fields.created ? new Date(e.fields.created) : null;
+        const releaseDate = e.fields.releaseDate ? new Date(e.fields.releaseDate) : null;
+        let readyForUATDate: Date | null = null;
+        if (e.changelog && Array.isArray(e.changelog.histories)) {
+          for (const h of e.changelog.histories) {
+            for (const item of h.items) {
+              if (item.field === 'status' && item.toString === 'READY_FOR_UAT') {
+                readyForUATDate = new Date(h.created);
+                break;
+              }
+            }
+            if (readyForUATDate) break;
+          }
+        }
+        let leadTimeDays: number | null = null;
+        if (created && releaseDate && !isNaN(created.getTime()) && !isNaN(releaseDate.getTime())) {
+          leadTimeDays = Math.round((releaseDate.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+          sumLeadTime += leadTimeDays;
+          countLeadTime++;
+        }
+        let leadTimeReadyForUAT: number | null = null;
+        if (created && readyForUATDate && !isNaN(created.getTime()) && !isNaN(readyForUATDate.getTime())) {
+          leadTimeReadyForUAT = Math.round((readyForUATDate.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+          sumLeadTimeReadyForUAT += leadTimeReadyForUAT;
+          countLeadTimeReadyForUAT++;
+        }
+        if (!leadTimeDays && !leadTimeReadyForUAT) {
+          skippedEpics.push({
+            key: e.key, summary: e.fields.summary, created: e.fields.created,
+            releaseDate: e.fields.releaseDate || null,
+            readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
+            reason: 'Mancano releaseDate e transizione READY_FOR_UAT',
+          });
+        } else {
+          outputEpics.push({
+            key: e.key, summary: e.fields.summary, created: e.fields.created,
+            releaseDate: e.fields.releaseDate || null,
+            readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
+            leadTimeDays, leadTimeReadyForUAT,
+          });
+        }
+      }
+      res.json({
+        team: team || null, projectKey,
+        from: fromDate ? fromDate.toISOString().slice(0, 10) : null,
+        to: toDate ? toDate.toISOString().slice(0, 10) : null,
+        meanLeadTimeDays: countLeadTime > 0 ? +(sumLeadTime / countLeadTime).toFixed(2) : null,
+        meanLeadTimeReadyForUAT: countLeadTimeReadyForUAT > 0 ? +(sumLeadTimeReadyForUAT / countLeadTimeReadyForUAT).toFixed(2) : null,
+        epics: outputEpics, skippedEpics,
+      });
+    } catch (error: any) {
+      console.error('Error in /api/dora/lead-time-epic:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch lead time for epics' });
+    }
+  });
+
+  // JIRA credentials - Save (POST)
+  app.post('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { jiraEmail, jiraApiToken, jiraHost, jiraEncryptionKey } = req.body;
+      if (!jiraEmail || !jiraApiToken || !jiraHost || !jiraEncryptionKey) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+      const encryptedToken = encryptJiraToken(jiraApiToken, jiraEncryptionKey);
+      await storage.upsertUserSettings(userId, { jiraEmail, jiraApiToken: encryptedToken, jiraHost });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error saving JIRA credentials:', error);
+      res.status(500).json({ error: error.message || 'Failed to save JIRA credentials' });
+    }
+  });
+
+  // JIRA credentials - Get (GET, no token exposed)
+  app.get('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getUserSettings(userId);
+      if (!settings) {
+        return res.status(404).json({ message: 'No JIRA credentials found' });
+      }
+      res.json({
+        jiraEmail: settings.jiraEmail,
+        jiraHost: settings.jiraHost,
+        hasToken: !!settings.jiraApiToken,
+      });
+    } catch (error: any) {
+      console.error('Error fetching JIRA credentials:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch JIRA credentials' });
     }
   });
 

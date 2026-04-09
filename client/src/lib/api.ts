@@ -118,5 +118,6 @@ export async function getJiraTasks(status?: string): Promise<JiraTask[]> {
 }
 
 export async function predictWeeklyTasks(weekStart?: string): Promise<WeeklyPredictionSummary> {
-  return apiRequest("POST", "/api/tasks/predict", { weekStart });
+  const response = await apiRequest("POST", "/api/tasks/predict", { weekStart });
+  return response.json() as Promise<WeeklyPredictionSummary>;
 }

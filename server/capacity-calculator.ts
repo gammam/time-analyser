@@ -1,4 +1,4 @@
-import type { Meeting, JiraTask, DailyCapacity, TaskCompletionPrediction } from "@shared/schema";
+import type { Meeting, JiraTask, DailyCapacity, TaskCompletionPrediction } from "../shared/schema.ts";
 
 const CONTEXT_SWITCHING_MINUTES = 20; // Time lost per task switch
 const STANDARD_WORK_DAY_HOURS = 8;

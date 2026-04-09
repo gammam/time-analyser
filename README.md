@@ -1,3 +1,36 @@
+## 📈 Deployment Frequency (DORA Metric)
+
+L’endpoint REST `/api/dora/deployment-frequency` restituisce la metrica Deployment Frequency filtrata per team e intervallo di date.
+
+**Parametri:**
+- `projectKey` (obbligatorio)
+- `team` (opzionale)
+- `from` (opzionale, ISO 8601)
+- `to` (opzionale, ISO 8601)
+
+**Output:**
+```json
+{
+   "team": "TeamA",
+   "projectKey": "PROJ",
+   "from": "2026-04-01",
+   "to": "2026-04-08",
+   "deploymentFrequency": 3
+}
+```
+
+**Formula:**
+Numero di versioni rilasciate (`released: true` e `releaseDate` valorizzato) nell’intervallo [`from`, `to`].
+
+**Esempio di chiamata:**
+```
+GET /api/dora/deployment-frequency?projectKey=PROJ&from=2026-04-01&to=2026-04-08
+```
+
+**Gestione errori:**
+- 400 se mancano parametri obbligatori o date non valide
+- 401/404/500 per errori autenticazione, projectKey errato, errori JIRA
+
 # ProdBuddy
 
 Your friendly productivity assistant that evaluates meeting effectiveness and predicts JIRA task completion based on available time and context switching overhead.
@@ -304,6 +337,56 @@ Configure in the Settings page:
 - `POST /api/jira/sync` - Sync from JIRA
 - `POST /api/tasks/predict` - Generate weekly predictions
 - `GET /api/tasks/predictions` - Get task predictions
+
+
+### DORA Metrics
+
+- `GET /api/dora/deployment-frequency?projectKey=PN` — Deployment Frequency (vedi sopra)
+- `GET /api/dora/lead-time-epic?projectKey=PN` — Lead Time for Changes (Epic)
+
+#### Lead Time for Changes (Epic)
+
+Calcola il tempo medio (in giorni) tra la creazione e il rilascio in produzione delle epiche di sviluppo JIRA, con possibilità di filtro per team e periodo.
+
+**Parametri:**
+- `projectKey` (obbligatorio)
+- `team` (opzionale)
+- `from` (opzionale, ISO 8601)
+- `to` (opzionale, ISO 8601)
+
+**Esempio di chiamata:**
+```
+GET /api/dora/lead-time-epic?projectKey=PROJ&from=2026-01-01&to=2026-03-31
+```
+
+
+**Esempio di risposta:**
+```json
+{
+   "team": "TeamA",
+   "projectKey": "PROJ",
+   "from": "2026-01-01",
+   "to": "2026-03-31",
+   "meanLeadTimeDays": 12.5,
+   "meanLeadTimeReadyForUAT": 8.2,
+   "epics": [
+      { "key": "EPIC-123", "summary": "Feature X", "created": "2026-01-10", "releaseDate": "2026-01-25", "readyForUATDate": "2026-01-20", "leadTimeDays": 15, "leadTimeReadyForUAT": 10 },
+      { "key": "EPIC-124", "summary": "Feature Y", "created": "2026-02-01", "releaseDate": "2026-02-10", "readyForUATDate": null, "leadTimeDays": 9, "leadTimeReadyForUAT": null }
+   ],
+   "skippedEpics": [
+      { "key": "EPIC-125", "summary": "Feature Z", "created": "2026-03-01", "releaseDate": null, "readyForUATDate": null, "reason": "Mancano releaseDate e transizione READY_FOR_UAT" }
+   ]
+}
+```
+
+**Nota:** Le epiche senza data di rilascio o transizione READY_FOR_UAT vengono escluse dal calcolo e segnalate nel campo `skippedEpics`.
+
+**Gestione errori:**
+- 400 se mancano parametri obbligatori o non validi
+- 401/404/500 per errori autenticazione, projectKey errato, errori JIRA
+
+**Specifica OpenAPI:**
+La definizione dettagliata dell’endpoint è disponibile in [`docs/openapi.yaml`](docs/openapi.yaml), sezione `/api/dora/lead-time-epic`.
 
 ### Challenges & Achievements
 - `GET /api/challenge/current` - Get current weekly challenge

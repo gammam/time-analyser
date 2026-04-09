@@ -1,4 +1,4 @@
-import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement, type JiraTask, type InsertJiraTask, type DailyCapacity, type InsertDailyCapacity, type TaskCompletionPrediction, type InsertTaskCompletionPrediction, type UserSettings, type InsertUserSettings, type UpdateUserSettings } from "@shared/schema";
+import { type User, type UpsertUser, type Meeting, type InsertMeeting, type MeetingScore, type InsertMeetingScore, type WeeklyChallenge, type InsertWeeklyChallenge, type Achievement, type InsertAchievement, type JiraTask, type InsertJiraTask, type DailyCapacity, type InsertDailyCapacity, type TaskCompletionPrediction, type InsertTaskCompletionPrediction, type UserSettings, type InsertUserSettings, type UpdateUserSettings } from "../shared/schema.ts";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -51,8 +51,8 @@ export interface IStorage {
 
 // Import database and Drizzle ORM utilities
 // Reference: blueprint:javascript_database
-import { db } from "./db";
-import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable, jiraTasks as jiraTasksTable, dailyCapacity as dailyCapacityTable, taskCompletionPredictions as taskCompletionPredictionsTable, userSettings as userSettingsTable } from "@shared/schema";
+import { db } from "./db.ts";
+import { users, meetings as meetingsTable, meetingScores as meetingScoresTable, weeklyChallenges as weeklyChallengesTable, achievements as achievementsTable, jiraTasks as jiraTasksTable, dailyCapacity as dailyCapacityTable, taskCompletionPredictions as taskCompletionPredictionsTable, userSettings as userSettingsTable } from "../shared/schema.ts";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export class DatabaseStorage implements IStorage {

@@ -1,3 +1,102 @@
+// Recupera tutte le epiche di un progetto/team con changelog (per READY_FOR_UAT)
+export async function fetchEpicsWithChangelog(userId: string, projectKey: string, team?: string, from?: string, to?: string) {
+  try {
+    const client = await getUncachableJiraClientForUser(userId);
+    // Costruisci JQL
+    let jql = `project = ${projectKey} AND issuetype = Epic`;
+    if (team) {
+      // Adatta il campo custom team se presente (es: "team" o customfield_xxx)
+      jql += ` AND team ~ \"${team}\"`;
+    }
+    if (from) {
+      jql += ` AND created >= \"${from}\"`;
+    }
+    if (to) {
+      jql += ` AND created <= \"${to}\"`;
+    }
+    // Recupera tutte le epiche con changelog
+    const issues = await client.issueSearch.searchForIssuesUsingJqlPost({
+      jql,
+      fields: ["key", "summary", "created", "status", "project", "team", "releaseDate"],
+      expand: ["changelog"],
+      maxResults: 1000 // Limite ragionevole
+    });
+    return issues.issues;
+  } catch (error: any) {
+    // Axios/Jira.js error structure
+    const status = error?.response?.status || error?.status;
+    let structuredError;
+    if (status === 401 || status === 403) {
+      structuredError = {
+        type: 'auth',
+        message: 'Autenticazione JIRA fallita: token o credenziali non valide.',
+        details: error?.response?.data || error?.message || error
+      };
+    } else if (status === 404) {
+      structuredError = {
+        type: 'not_found',
+        message: `ProjectKey o ID non valido: ${projectKey}`,
+        details: error?.response?.data || error?.message || error
+      };
+    } else {
+      structuredError = {
+        type: 'unknown',
+        message: `Errore nella ricerca epiche JIRA (status: ${status}): ${error?.message || 'Errore sconosciuto'}`,
+        details: error?.response?.data || error?.message || error
+      };
+    }
+    console.error(`[JIRA] Errore nel recupero epiche per progetto ${projectKey}:`, structuredError);
+    throw structuredError;
+  }
+}
+// Recupera tutte le versioni di un progetto JIRA (solo log, nessun filtro applicato)
+export async function fetchProjectVersionsRaw(userId: string, projectKey: string) {
+  try {
+    const client = await getUncachableJiraClientForUser(userId);
+    const versions = await client.projectVersions.getProjectVersions({ projectIdOrKey: projectKey });
+    console.log(`[JIRA] Versioni per progetto ${projectKey}:`, versions);
+    return versions;
+  } catch (error: any) {
+    // Axios/Jira.js error structure
+    const status = error?.response?.status || error?.status;
+    let structuredError;
+    if (status === 401 || status === 403) {
+      structuredError = {
+        type: 'auth',
+        message: 'Autenticazione JIRA fallita: token o credenziali non valide.',
+        details: error?.response?.data || error?.message || error
+      };
+    } else if (status === 404) {
+      structuredError = {
+        type: 'not_found',
+        message: `ProjectKey o ID non valido: ${projectKey}`,
+        details: error?.response?.data || error?.message || error
+      };
+    } else {
+      structuredError = {
+        type: 'unknown',
+        message: 'Errore sconosciuto durante la chiamata a JIRA',
+        details: error?.response?.data || error?.message || error
+      };
+    }
+    console.error(`[JIRA] Errore nel recupero versioni per progetto ${projectKey}:`, structuredError);
+    throw structuredError;
+  }
+}
+import { storage } from './storage.ts';
+import { decryptJiraToken } from './jira-crypto.ts';
+// Recupera le credenziali JIRA per un dato userId dal database e le decifra
+export async function getUserJiraCredentials(userId: string) {
+  const settings = await storage.getUserSettings(userId);
+  if (!settings || !settings.jiraEmail || !settings.jiraApiToken || !settings.jiraHost || !settings.jiraEncryptionKey) {
+    throw new Error('JIRA credentials not configured for user');
+  }
+  return {
+    email: settings.jiraEmail,
+    apiToken: decryptJiraToken(settings.jiraApiToken, settings.jiraEncryptionKey),
+    host: settings.jiraHost,
+  };
+}
 import { Version3Client } from 'jira.js';
 
 // JIRA Client using Personal Access Token (PAT) with Basic Authentication
@@ -24,13 +123,11 @@ async function getJiraConfig(userCredentials?: JiraCredentials) {
 
 // WARNING: Never cache this client.
 // Always call this function to get a fresh client.
-// Pass user credentials to use user-specific configuration instead of global env variables
-export async function getUncachableJiraClient(userCredentials?: JiraCredentials) {
-  const { email, apiToken, host } = await getJiraConfig(userCredentials);
-
+// Crea un client JIRA usando le credenziali per-utente (recuperate dal DB)
+export async function getUncachableJiraClientForUser(userId: string) {
+  const { email, apiToken, host } = await getUserJiraCredentials(userId);
   console.log('Creating JIRA client with Basic auth for:', email);
   console.log('Using JIRA host:', host);
-
   return new Version3Client({
     host,
     authentication: {

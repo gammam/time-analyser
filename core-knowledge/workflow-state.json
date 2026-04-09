@@ -1,0 +1,17 @@
+{
+  "lastUpdated": "2026-04-02",
+  "activeWorkflow": null,
+  "chapters": {
+    "01-architecture": "todo",
+    "02-auth": "todo",
+    "03-database": "todo",
+    "04-api-routes": "todo",
+    "05-scoring-engine": "todo",
+    "06-google-integration": "todo",
+    "07-jira-integration": "todo",
+    "08-gamification": "todo",
+    "09-frontend": "todo",
+    "10-dev-setup": "complete"
+  },
+  "processedUserDataFiles": []
+}

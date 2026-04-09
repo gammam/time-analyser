@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { InsertWeeklyChallenge, InsertAchievement } from "@shared/schema";
+import { InsertWeeklyChallenge, InsertAchievement } from "../shared/schema.ts";
 
 interface CriteriaStats {
   agenda: number;

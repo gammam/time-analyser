@@ -1,7 +1,7 @@
 // Recupera tutte le epiche di un progetto/team con changelog (per READY_FOR_UAT)
 export async function fetchEpicsWithChangelog(userId: string, projectKey: string, team?: string, from?: string, to?: string) {
   try {
-    const client = await getUncachableJiraClientForUser(userId);
+    const { email, apiToken, host } = await getUserJiraCredentials(userId);
     // Costruisci JQL
     let jql = `project = ${projectKey} AND issuetype = Epic`;
     if (team) {
@@ -14,14 +14,47 @@ export async function fetchEpicsWithChangelog(userId: string, projectKey: string
     if (to) {
       jql += ` AND created <= \"${to}\"`;
     }
-    // Recupera tutte le epiche con changelog
-    const issues = await client.issueSearch.searchForIssuesUsingJqlPost({
-      jql,
-      fields: ["key", "summary", "created", "status", "project", "team", "releaseDate"],
-      expand: ["changelog"],
-      maxResults: 1000 // Limite ragionevole
-    });
-    return issues.issues;
+    // Jira cloud deprecation path requires /rest/api/3/search/jql.
+    // Changelog is fetched per issue from /issue/{key}/changelog.
+    const normalizedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+    const url = `${normalizedHost}/rest/api/3/search/jql`;
+    const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+    const allIssues: any[] = [];
+    let nextPageToken: string | undefined = undefined;
+
+    do {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jql,
+          maxResults: 100,
+          fields: ["summary", "created", "status", "fixVersions"],
+          expand: "changelog",
+          fieldsByKeys: false,
+          nextPageToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const err: any = new Error(`Request failed with status code ${response.status}`);
+        err.status = response.status;
+        err.response = { status: response.status, data: errorData };
+        throw err;
+      }
+
+      const data: any = await response.json();
+      const pageIssues = data.issues || data.values || [];
+      allIssues.push(...pageIssues);
+      nextPageToken = data.nextPageToken;
+    } while (nextPageToken);
+
+    return allIssues;
   } catch (error: any) {
     // Axios/Jira.js error structure
     const status = error?.response?.status || error?.status;

@@ -86,7 +86,7 @@ assignee: TBD
 - [ ] Definisci o aggiorna la specifica OpenAPI per l’endpoint `/api/dora/lead-time-epic` (parametri, risposta, errori)
 
 - [ ] Analizza la specifica e definisci la struttura dell’endpoint `/api/dora/lead-time-epic`
-- [ ] Implementa la logica di query JIRA per epiche, release e transizioni di stato
+- [x] Implementa la logica di query JIRA per epiche, release e transizioni di stato
 - [ ] Calcola e restituisci la media e il dettaglio dei lead time (rilascio, READY_FOR_UAT)
 - [ ] Gestisci errori, dati mancanti e output chiaro
 - [ ] Aggiorna la documentazione tecnica e inserisci esempi
@@ -103,15 +103,18 @@ assignee: TBD
 Debug Log:
   - [2026-04-09] Endpoint REST /api/dora/lead-time-epic aggiunto in routes.ts (solo struttura, status 501)
   - [2026-04-09] Avviata implementazione funzione di query JIRA per epiche e changelog (READY_FOR_UAT)
+  - [2026-04-09] Migrazione `fetchEpicsWithChangelog` all'Enhanced Search API `POST /rest/api/3/search/jql` con payload conforme (`nextPageToken`) e test client passato (502 epiche)
 Completion Notes:
 
 - server/routes.ts (nuovo endpoint REST)
 - server/jira-client.ts (funzione query epiche e changelog)
+- scripts/test-fetchEpicsWithChangelog.ts (test client JIRA per query epiche/changelog)
 - test/server/lead-time-epic.test.ts (test automatici)
 - README.md / docs (documentazione tecnica)
 
 ## Change Log
 - 2026-04-09: Creazione story file per US12 Lead Time for Changes (Epic)
+- 2026-04-09: Migrazione client JIRA da API search deprecata a Enhanced Search API per `fetchEpicsWithChangelog`
 
 ## Status
 ready-for-dev

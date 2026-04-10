@@ -6,8 +6,8 @@ async function main() {
   const userId = process.argv[2] || 'local-dev-user';
   const projectKey = process.argv[3] || 'PN';
   const team = process.argv[4]; // opzionale
-  const from = process.argv[5]; // opzionale, es. "2026-01-01"
-  const to = process.argv[6]; // opzionale, es. "2026-12-31"
+  const from = process.argv[5] || "2026-03-10"
+  const to = process.argv[6] || "2026-03-31"
 
   console.log('🔍 Test fetchEpicsWithChangelog con parametri:');
   console.log(`  userId: ${userId}`);
@@ -22,7 +22,8 @@ async function main() {
     
     console.log('✅ fetchEpicsWithChangelog eseguita con successo');
     console.log(`Total epics found: ${epics?.length || 0}`);
-    
+    console.log(`Epics: ${JSON.stringify(epics, null, 2)}`);
+
     if (epics && epics.length > 0) {
       console.log('\n📋 Prima epic:');
       const firstEpic = epics[0];

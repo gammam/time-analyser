@@ -1,7 +1,16 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+
+function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
 
 const app = express();
 app.use(express.json());
@@ -37,7 +46,7 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+export async function createServer() {
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -47,6 +56,13 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
     throw err;
   });
+
+  return { app, server };
+}
+
+async function bootstrap() {
+  const { app, server } = await createServer();
+  const { setupVite, serveStatic } = await import("./vite");
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -66,4 +82,8 @@ app.use((req, res, next) => {
   server.listen(port, host, () => {
     log(`serving on ${host}:${port}`);
   });
-})();
+}
+
+if (typeof process !== 'undefined' && process.argv[1] && process.argv[1].endsWith('server/index.ts')) {
+  bootstrap();
+}

@@ -926,6 +926,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DORA: Change Failure Rate (Dual-metric: DORA + SEND)
+  app.get('/api/dora/change-failure-rate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims.sub;
+      const projectKey = typeof req.query.projectKey === 'string' ? req.query.projectKey : undefined;
+      const team = typeof req.query.team === 'string' ? req.query.team : undefined;
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+
+      // AC #2: Validate projectKey as required
+      if (!projectKey) {
+        return res.status(400).json({ error: 'Missing or invalid projectKey' });
+      }
+
+      // AC #2: Validate date formats
+      let fromDate: Date | undefined;
+      let toDate: Date | undefined;
+      if (from) {
+        const d = new Date(from);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid from date' });
+        fromDate = d;
+      }
+      if (to) {
+        const d = new Date(to);
+        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid to date' });
+        toDate = d;
+      }
+
+      // Placeholder: Will implement Jira data retrieval in Task 2
+      // For now, return zero-deploy structure for AC #8 validation
+      const releases: any[] = [];
+      const unmappedFailures: any[] = [];
+
+      // AC #8: When totalDeployments = 0, changeFailureRate = null
+      const doraMetrics = {
+        totalDeployments: 0,
+        failedDeployments: 0,
+        changeFailureRate: null,
+      };
+
+      const sendMetrics = {
+        totalDeployments: 0,
+        failedDeployments: 0,
+        changeFailureRate: null,
+      };
+
+      // AC #9: Return nested dora and send sub-objects
+      res.json({
+        team: team || null,
+        projectKey,
+        from: fromDate ? fromDate.toISOString().slice(0, 10) : null,
+        to: toDate ? toDate.toISOString().slice(0, 10) : null,
+        dora: doraMetrics,
+        send: sendMetrics,
+        releases,
+        unmappedFailures,
+      });
+    } catch (err: any) {
+      // AC #10: Structured error handling consistent with other DORA endpoints
+      if (err && err.type && err.message) {
+        res.status(err.type === 'auth' ? 401 : err.type === 'not_found' ? 404 : 500).json({
+          error: err.message, type: err.type, details: err.details
+        });
+      } else {
+        res.status(500).json({ error: err?.message || 'Failed to fetch change failure rate' });
+      }
+    }
+  });
+
   // JIRA credentials - Save (POST)
   app.post('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {
     try {

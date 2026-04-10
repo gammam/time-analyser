@@ -370,16 +370,89 @@ GET /api/dora/lead-time-epic?projectKey=PROJ&from=2026-01-01&to=2026-03-31
    "meanLeadTimeDays": 12.5,
    "meanLeadTimeReadyForUAT": 8.2,
    "epics": [
-      { "key": "EPIC-123", "summary": "Feature X", "created": "2026-01-10", "releaseDate": "2026-01-25", "readyForUATDate": "2026-01-20", "leadTimeDays": 15, "leadTimeReadyForUAT": 10 },
-      { "key": "EPIC-124", "summary": "Feature Y", "created": "2026-02-01", "releaseDate": "2026-02-10", "readyForUATDate": null, "leadTimeDays": 9, "leadTimeReadyForUAT": null }
+      {
+         "key": "EPIC-123",
+         "summary": "Feature X",
+         "created": "2026-01-10",
+         "fixVersions": [
+            { "id": "10001", "name": "Release 1.4.0", "releaseDate": "2026-01-25" }
+         ],
+         "releaseDate": "2026-01-25",
+         "readyForUATDate": "2026-01-20",
+         "leadTimeDays": 15,
+         "leadTimeReadyForUAT": 10
+      },
+      {
+         "key": "EPIC-124",
+         "summary": "Feature Y",
+         "created": "2026-02-01",
+         "fixVersions": [
+            { "id": "10002", "name": "Release 1.5.0", "releaseDate": "2026-02-10" }
+         ],
+         "releaseDate": "2026-02-10",
+         "readyForUATDate": null,
+         "leadTimeDays": 9,
+         "leadTimeReadyForUAT": null
+      }
    ],
    "skippedEpics": [
-      { "key": "EPIC-125", "summary": "Feature Z", "created": "2026-03-01", "releaseDate": null, "readyForUATDate": null, "reason": "Mancano releaseDate e transizione READY_FOR_UAT" }
+      {
+         "key": "EPIC-125",
+         "summary": "Feature Z",
+         "created": "2026-03-01",
+         "fixVersions": [],
+         "releaseDate": null,
+         "readyForUATDate": null,
+         "reason": "Mancano releaseDate e transizione READY_FOR_UAT"
+      }
    ]
 }
 ```
 
 **Nota:** Le epiche senza data di rilascio o transizione READY_FOR_UAT vengono escluse dal calcolo e segnalate nel campo `skippedEpics`.
+
+**Come viene calcolato il lead time:**
+
+L'endpoint interroga JIRA cercando tutte le issue di tipo `Epic` del progetto richiesto:
+
+- `project = <projectKey> AND issuetype = Epic`
+- filtro opzionale per `team`
+- filtro opzionale su `created >= from`
+- filtro opzionale su `created <= to`
+
+Per ogni epic, il backend valuta due tempi distinti:
+
+1. `leadTimeDays`
+   - parte da `fields.created`
+   - usa come data di rilascio `fields.fixVersions[0].releaseDate`
+   - calcola la differenza in giorni interi tra creazione e rilascio
+
+2. `leadTimeReadyForUAT`
+   - parte da `fields.created`
+   - cerca nel changelog la prima transizione di stato con:
+     - `item.field === "status"`
+     - `item.toString === "READY_FOR_UAT"`
+   - usa `history.created` di quella transizione come `readyForUATDate`
+   - calcola la differenza in giorni interi tra creazione e passaggio a READY_FOR_UAT
+
+Le medie esposte in risposta sono:
+
+- `meanLeadTimeDays`: media dei `leadTimeDays` disponibili
+- `meanLeadTimeReadyForUAT`: media dei `leadTimeReadyForUAT` disponibili
+
+Se un'epica non ha né `releaseDate` né una transizione `READY_FOR_UAT`, non entra nel calcolo delle medie e viene riportata in `skippedEpics`.
+
+**Campi JIRA usati nella valutazione:**
+
+- `key`: identificativo dell'epica, restituito nel payload finale
+- `fields.summary`: titolo leggibile dell'epica
+- `fields.created`: data di creazione, base di tutti i calcoli
+- `fields.fixVersions`: elenco delle fix version associate all'epica
+- `fields.fixVersions[0].releaseDate`: data di rilascio usata per `leadTimeDays`
+- `changelog.histories[].created`: timestamp della transizione di stato
+- `changelog.histories[].items[]`: elementi del changelog usati per identificare il passaggio a `READY_FOR_UAT`
+
+In pratica, la metrica misura quanto tempo passa dall'apertura dell'epica al suo primo rilascio tracciato in `fixVersions`, e in parallelo quanto tempo passa fino a quando l'epica raggiunge lo stato `READY_FOR_UAT`.
 
 **Gestione errori:**
 - 400 se mancano parametri obbligatori o non validi

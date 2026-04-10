@@ -10,6 +10,7 @@ import { setupAuth, isAuthenticated, isLocalAuthBypassed, getLocalDevUser } from
 import { getAuthUrl, getTokensFromCode } from "./google-oauth";
 import jwt from 'jsonwebtoken';
 import { encryptJiraToken, decryptJiraToken } from "./jira-crypto";
+import { stringify } from "querystring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
@@ -868,7 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const skippedEpics: any[] = [];
       for (const e of epics) {
         const created = e.fields.created ? new Date(e.fields.created) : null;
-        const releaseDate = e.fields.releaseDate ? new Date(e.fields.releaseDate) : null;
+        const releaseDate = e.fields.fixVersions?.[0]?.releaseDate ? new Date(e.fields.fixVersions[0].releaseDate) : null;
         let readyForUATDate: Date | null = null;
         if (e.changelog && Array.isArray(e.changelog.histories)) {
           for (const h of e.changelog.histories) {
@@ -895,15 +896,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (!leadTimeDays && !leadTimeReadyForUAT) {
           skippedEpics.push({
-            key: e.key, summary: e.fields.summary, created: e.fields.created,
-            releaseDate: e.fields.releaseDate || null,
+            key: e.key, summary: e.fields.summary, created: created?.toISOString().slice(0, 10) || null,
+            fixVersions: e.fields.fixVersions || [],
+            releaseDate: releaseDate ? releaseDate.toISOString().slice(0, 10) : null,
             readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
             reason: 'Mancano releaseDate e transizione READY_FOR_UAT',
           });
         } else {
           outputEpics.push({
-            key: e.key, summary: e.fields.summary, created: e.fields.created,
-            releaseDate: e.fields.releaseDate || null,
+            key: e.key, summary: e.fields.summary, created: created?.toISOString().slice(0, 10) || null,
+            fixVersions: e.fields.fixVersions || [],
+            releaseDate: releaseDate ? releaseDate.toISOString().slice(0, 10) : null,
             readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
             leadTimeDays, leadTimeReadyForUAT,
           });

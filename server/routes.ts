@@ -954,22 +954,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toDate = d;
       }
 
-      // Placeholder: Will implement Jira data retrieval in Task 2
-      // For now, return zero-deploy structure for AC #8 validation
-      const releases: any[] = [];
-      const unmappedFailures: any[] = [];
+      const { fetchProjectVersionsRaw, fetchProductionBugsForReleases } = await import('./jira-client');
+      const versions = await fetchProjectVersionsRaw(userId, projectKey);
+      const versionList = Array.isArray(versions)
+        ? versions
+        : (Array.isArray((versions as any)?.values) ? (versions as any).values : []);
 
-      // AC #8: When totalDeployments = 0, changeFailureRate = null
+      // AC #4: only released versions with releaseDate in the requested interval
+      const filteredReleases = versionList.filter((v: any) => {
+        if (!v?.released || !v?.releaseDate) return false;
+        const relDate = new Date(v.releaseDate);
+        if (isNaN(relDate.getTime())) return false;
+        if (fromDate && relDate < fromDate) return false;
+        if (toDate && relDate > toDate) return false;
+        return true;
+      });
+
+      const releaseNames = filteredReleases
+        .map((v: any) => v?.name)
+        .filter((name: any) => typeof name === 'string' && name.length > 0);
+
+      // AC #5: retrieve only [SEND] Bug Prod issues, dynamically filtered by Affects Version/s
+      const productionBugs = await fetchProductionBugsForReleases(
+        userId,
+        projectKey,
+        releaseNames,
+        team,
+        from,
+        to,
+      );
+
+      const releaseIndex = new Map<string, any>();
+      for (const release of filteredReleases) {
+        releaseIndex.set(release.name, {
+          id: release.id,
+          name: release.name,
+          releaseDate: release.releaseDate,
+          isGaOrHotfix: /^ga/i.test(release.name || '') || /hotfix/i.test(release.name || ''),
+          failureCount: 0,
+          failureIssues: [],
+        });
+      }
+
+      const unmappedFailures: any[] = [];
+      for (const bug of productionBugs) {
+        let mapped = false;
+        for (const releaseName of bug.releaseNames || []) {
+          const release = releaseIndex.get(releaseName);
+          if (!release) continue;
+          mapped = true;
+          release.failureIssues.push({
+            key: bug.key,
+            issueType: bug.issueType,
+            created: bug.created,
+          });
+        }
+        if (!mapped) {
+          unmappedFailures.push({
+            key: bug.key,
+            summary: bug.summary,
+            created: bug.created,
+            reason: 'No Affects Version/s value found',
+          });
+        }
+      }
+
+      const releases = Array.from(releaseIndex.values()).map((release: any) => ({
+        ...release,
+        failureCount: release.failureIssues.length,
+      }));
+
+      const doraTotal = releases.length;
+      const doraFailed = releases.filter((r: any) => r.failureCount > 0).length;
+      const sendReleases = releases.filter((r: any) => r.isGaOrHotfix);
+      const sendTotal = sendReleases.length;
+      const sendFailed = sendReleases.filter((r: any) => r.failureCount > 0).length;
+
       const doraMetrics = {
-        totalDeployments: 0,
-        failedDeployments: 0,
-        changeFailureRate: null,
+        totalDeployments: doraTotal,
+        failedDeployments: doraFailed,
+        changeFailureRate: doraTotal > 0 ? +((doraFailed / doraTotal) * 100).toFixed(2) : null,
       };
 
       const sendMetrics = {
-        totalDeployments: 0,
-        failedDeployments: 0,
-        changeFailureRate: null,
+        totalDeployments: sendTotal,
+        failedDeployments: sendFailed,
+        changeFailureRate: sendTotal > 0 ? +((sendFailed / sendTotal) * 100).toFixed(2) : null,
       };
 
       // AC #9: Return nested dora and send sub-objects

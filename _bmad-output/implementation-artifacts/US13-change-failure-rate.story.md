@@ -133,16 +133,16 @@ so that the UI can show how often deployments cause failures.
 
 ## Tasks / Subtasks
 
-- [ ] Define the dual-metric contract and route shape (AC: 1, 2, 9, 10, 12)
-  - [ ] Add the new REST route in `server/routes.ts` near the existing DORA endpoints.
-  - [ ] Align request validation and error handling with the existing deployment-frequency and lead-time-epic routes.
-  - [ ] Structure response to include both `dora` and `send` sub-objects with their respective metrics.
-  - [ ] Document the zero-deploy behavior: `changeFailureRate = null` when `totalDeployments = 0`.
-- [ ] Implement Jira data retrieval for `[SEND] Bug Prod` failures and release mapping (AC: 3, 4, 5, 6, 11)
-  - [ ] Reuse or extend the version-fetching logic in `server/jira-client.ts` for release retrieval (identical to deployment-frequency).
-  - [ ] Add a Jira client function `fetchProductionBugsForReleases(...)` to query **only** `[SEND] Bug Prod` issues with dynamic JQL filtering by `Affects Version/s`.
-  - [ ] Request fields: `key`, `summary`, `created`, `issuetype` (must equal `[SEND] Bug Prod`), `versions` / `affectedVersions`.
-  - [ ] Normalize structured errors exactly as done for other Jira client helpers.
+- [x] Define the dual-metric contract and route shape (AC: 1, 2, 9, 10, 12)
+  - [x] Add the new REST route in `server/routes.ts` near the existing DORA endpoints.
+  - [x] Align request validation and error handling with the existing deployment-frequency and lead-time-epic routes.
+  - [x] Structure response to include both `dora` and `send` sub-objects with their respective metrics.
+  - [x] Document the zero-deploy behavior: `changeFailureRate = null` when `totalDeployments = 0`.
+- [x] Implement Jira data retrieval for `[SEND] Bug Prod` failures and release mapping (AC: 3, 4, 5, 6, 11)
+  - [x] Reuse or extend the version-fetching logic in `server/jira-client.ts` for release retrieval (identical to deployment-frequency).
+  - [x] Add a Jira client function `fetchProductionBugsForReleases(...)` to query **only** `[SEND] Bug Prod` issues with dynamic JQL filtering by `Affects Version/s`.
+  - [x] Request fields: `key`, `summary`, `created`, `issuetype` (must equal `[SEND] Bug Prod`), `versions` / `affectedVersions`.
+  - [x] Normalize structured errors exactly as done for other Jira client helpers.
 - [ ] Implement dual-metric aggregation logic (AC: 7, 8, 10)
   - [ ] Filter releases by `released: true` and `releaseDate` in interval.
   - [ ] Compute `dora.totalDeployments` = all released versions in interval.
@@ -259,15 +259,24 @@ GPT-5.4
 
 - 2026-04-10: Created story context for new Change Failure Rate backend implementation.
 - 2026-04-10: Reused repository knowledge from existing DORA endpoints, tests, and documentation updates.
+- 2026-04-10: Added E2E test for change-failure-rate aligned to lead-time E2E pattern (spawn + fetch + dedicated port 3102).
+- 2026-04-10: Implemented Jira helper `fetchProductionBugsForReleases(...)` and connected CFR route to real Jira versions + `[SEND] Bug Prod` mapping.
 
 ### Completion Notes List
 
 - Story file created directly because no `sprint-status.yaml` is present in implementation artifacts.
 - Story intentionally includes open questions about Jira version-mapping fields because the source documents describe the metric but do not fully fix the field mapping.
+- Task 1 completed: CFR route contract implemented with parameter validation, structured error shape, and dual-metric response envelope.
+- Task 2 completed: Jira retrieval implemented with dynamic JQL on `[SEND] Bug Prod` and `affectedVersion`, normalized mapping from `fields.versions` + `fields.affectedVersions`.
+- Validation executed: `npx jest server/change-failure-rate.test.ts --runInBand` passed (4/4).
+- Repository-wide `npm run check` still reports pre-existing unrelated errors in `server/jira-client-smoketest.ts` and `server/jira-crypto.test.ts`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/US13-change-failure-rate.story.md`
+- `server/routes.ts`
+- `server/jira-client.ts`
+- `server/change-failure-rate.test.ts`
 
 ## Change Log
 
@@ -278,6 +287,7 @@ GPT-5.4
   - Acceptance criteria clarified for issue type specificity and GA/HOTFIX filtering
   - Tasks restructured to emphasize `[SEND] Bug Prod` query and dual aggregation
   - Open questions consolidated; GA/HOTFIX naming detection strategy moved to clarifications
+- 2026-04-10: Completed Task 1 and Task 2 implementation with passing E2E test for `/api/dora/change-failure-rate`.
 
 ## Status
 

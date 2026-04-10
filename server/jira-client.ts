@@ -116,6 +116,119 @@ export async function fetchProjectVersionsRaw(userId: string, projectKey: string
     throw structuredError;
   }
 }
+
+// Recupera i bug di produzione [SEND] Bug Prod con mapping su Affects Version/s
+export async function fetchProductionBugsForReleases(
+  userId: string,
+  projectKey: string,
+  releaseNames: string[],
+  team?: string,
+  from?: string,
+  to?: string,
+) {
+  try {
+    const { email, apiToken, host } = await getUserJiraCredentials(userId);
+    const normalizedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+    const url = `${normalizedHost}/rest/api/3/search/jql`;
+    const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+
+    // AC #5: query only [SEND] Bug Prod and filter by Affects Version/s when release names are available.
+    let jql = `project = ${projectKey} AND issuetype = "[SEND] Bug Prod"`;
+    if (team) {
+      jql += ` AND team ~ "${team}"`;
+    }
+    if (from) {
+      jql += ` AND created >= "${from}"`;
+    }
+    if (to) {
+      jql += ` AND created <= "${to}"`;
+    }
+    if (releaseNames.length > 0) {
+      const quoted = releaseNames
+        .map((name) => `"${String(name).replace(/"/g, '\\"')}"`)
+        .join(',');
+      jql += ` AND "affectedVersion" in (${quoted})`;
+    }
+
+    const allIssues: any[] = [];
+    let nextPageToken: string | undefined;
+
+    do {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jql,
+          maxResults: 100,
+          fields: ['summary', 'created', 'issuetype', 'versions', 'affectedVersions', 'status', 'resolutiondate'],
+          fieldsByKeys: false,
+          nextPageToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const err: any = new Error(`Request failed with status code ${response.status}`);
+        err.status = response.status;
+        err.response = { status: response.status, data: errorData };
+        throw err;
+      }
+
+      const data: any = await response.json();
+      const pageIssues = data.issues || data.values || [];
+      allIssues.push(...pageIssues);
+      nextPageToken = data.nextPageToken;
+    } while (nextPageToken);
+
+    return allIssues
+      .filter((issue: any) => issue?.fields?.issuetype?.name === '[SEND] Bug Prod')
+      .map((issue: any) => {
+        const versions = Array.isArray(issue?.fields?.versions) ? issue.fields.versions : [];
+        const affectedVersions = Array.isArray(issue?.fields?.affectedVersions) ? issue.fields.affectedVersions : [];
+        const allMapped = [...versions, ...affectedVersions];
+        const mappedReleaseNames = Array.from(
+          new Set(allMapped.map((v: any) => v?.name).filter((name: any) => typeof name === 'string' && name.length > 0)),
+        );
+
+        return {
+          key: issue.key,
+          summary: issue?.fields?.summary || null,
+          created: issue?.fields?.created || null,
+          issueType: issue?.fields?.issuetype?.name || null,
+          releaseNames: mappedReleaseNames,
+        };
+      });
+  } catch (error: any) {
+    const status = error?.response?.status || error?.status;
+    let structuredError;
+    if (status === 401 || status === 403) {
+      structuredError = {
+        type: 'auth',
+        message: 'Autenticazione JIRA fallita: token o credenziali non valide.',
+        details: error?.response?.data || error?.message || error,
+      };
+    } else if (status === 404) {
+      structuredError = {
+        type: 'not_found',
+        message: `ProjectKey o ID non valido: ${projectKey}`,
+        details: error?.response?.data || error?.message || error,
+      };
+    } else {
+      structuredError = {
+        type: 'unknown',
+        message: `Errore nella ricerca bug produzione JIRA (status: ${status}): ${error?.message || 'Errore sconosciuto'}`,
+        details: error?.response?.data || error?.message || error,
+      };
+    }
+    console.error(`[JIRA] Errore nel recupero bug produzione per progetto ${projectKey}:`, structuredError);
+    throw structuredError;
+  }
+}
+
 import { storage } from './storage.ts';
 import { decryptJiraToken } from './jira-crypto.ts';
 // Recupera le credenziali JIRA per un dato userId dal database e le decifra

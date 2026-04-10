@@ -111,6 +111,80 @@ GET /api/dora/change-failure-rate?projectKey=PROJ&from=2026-03-01&to=2026-03-31
 - 404 per `projectKey` non trovato
 - 500 per errori interni/JIRA non classificati
 
+## 🛠️ Mean Time to Restore (MTTR) — SEND Prod BUG
+
+L'endpoint REST `/api/dora/mean-time-to-restore` calcola il tempo medio di ripristino dei bug di produzione SEND.
+
+**Parametri:**
+- `projectKey` (obbligatorio)
+- `team` (opzionale)
+- `from` (opzionale, ISO 8601)
+- `to` (opzionale, ISO 8601)
+
+**Formula:**
+- `restoreHours = (resolutionDate - created) in ore`
+- `mttrHours = media(restoreHours)`
+
+**Regole di calcolo:**
+- Scope esclusivo: issue Jira con `issuetype = "[SEND] Bug Prod"`.
+- Le issue senza `resolutiondate` sono escluse dal calcolo e riportate in `skippedIssues`.
+- Se non ci sono issue risolte nel periodo, `mttrHours = null`.
+- Percentili `p50Hours` e `p90Hours` calcolati sulle sole issue risolte.
+
+**Campi Jira usati:**
+- `key`
+- `fields.summary`
+- `fields.created`
+- `fields.resolutiondate`
+- `fields.issuetype`
+- `fields.status`
+
+**Output esempio:**
+```json
+{
+   "team": "TeamA",
+   "projectKey": "PN",
+   "from": "2026-03-01",
+   "to": "2026-03-31",
+   "mttrHours": 18.25,
+   "p50Hours": 12,
+   "p90Hours": 36,
+   "totalIncidents": 8,
+   "resolvedIncidents": 6,
+   "unresolvedIncidents": 2,
+   "issues": [
+      {
+         "key": "PN-19053",
+         "summary": "Errore in produzione su recapito",
+         "created": "2026-03-19T10:23:28.776+0100",
+         "resolutionDate": "2026-03-20T09:10:00.000+0100",
+         "restoreHours": 22.78,
+         "issueType": "[SEND] Bug Prod",
+         "status": "Done"
+      }
+   ],
+   "skippedIssues": [
+      {
+         "key": "PN-19299",
+         "summary": "Bug ancora aperto",
+         "created": "2026-03-30T11:02:10.111+0100",
+         "reason": "Missing resolutiondate"
+      }
+   ]
+}
+```
+
+**Esempio chiamata:**
+```
+GET /api/dora/mean-time-to-restore?projectKey=PROJ&from=2026-03-01&to=2026-03-31
+```
+
+**Gestione errori:**
+- 400 se `projectKey` manca o date non valide
+- 401 per credenziali JIRA non valide
+- 404 per `projectKey` non trovato
+- 500 per errori interni/JIRA non classificati
+
 # ProdBuddy
 
 Your friendly productivity assistant that evaluates meeting effectiveness and predicts JIRA task completion based on available time and context switching overhead.

@@ -11,6 +11,8 @@ import { getAuthUrl, getTokensFromCode } from "./google-oauth";
 import jwt from 'jsonwebtoken';
 import { encryptJiraToken, decryptJiraToken } from "./jira-crypto";
 import { createChangeFailureRateHandler } from "./change-failure-rate-handler";
+import { createLeadTimeEpicHandler } from "./lead-time-epic-handler";
+import { createMeanTimeToRestoreHandler } from "./mean-time-to-restore-handler";
 import { stringify } from "querystring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -829,103 +831,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DORA: Lead Time for Changes (Epic)
-  app.get('/api/dora/lead-time-epic', isAuthenticated, async (req: any, res: any) => {
-    try {
-      const userId = req.user.claims.sub;
-      const projectKey = typeof req.query.projectKey === 'string' ? req.query.projectKey : undefined;
-      const team = typeof req.query.team === 'string' ? req.query.team : undefined;
-      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
-      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-      if (!projectKey) {
-        return res.status(400).json({ error: 'Missing or invalid projectKey' });
-      }
-      let fromDate: Date | undefined;
-      let toDate: Date | undefined;
-      if (from) {
-        const d = new Date(from);
-        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid from date' });
-        fromDate = d;
-      }
-      if (to) {
-        const d = new Date(to);
-        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid to date' });
-        toDate = d;
-      }
+  const leadTimeEpicHandler = createLeadTimeEpicHandler({
+    fetchEpicsWithChangelog: async (
+      userId: string,
+      projectKey: string,
+      team?: string,
+      from?: string,
+      to?: string,
+    ) => {
       const { fetchEpicsWithChangelog } = await import('./jira-client');
-      let epics: any[] = [];
-      try {
-        const result = await fetchEpicsWithChangelog(userId, projectKey, team, from, to);
-        epics = Array.isArray(result) ? result : [];
-      } catch (err: any) {
-        if (err && err.type && err.message) {
-          return res.status(err.type === 'auth' ? 401 : err.type === 'not_found' ? 404 : 500).json({
-            error: err.message, type: err.type, details: err.details
-          });
-        }
-        return res.status(500).json({ error: err?.message || 'Unknown error' });
-      }
-      let sumLeadTime = 0, countLeadTime = 0;
-      let sumLeadTimeReadyForUAT = 0, countLeadTimeReadyForUAT = 0;
-      const outputEpics: any[] = [];
-      const skippedEpics: any[] = [];
-      for (const e of epics) {
-        const created = e.fields.created ? new Date(e.fields.created) : null;
-        const releaseDate = e.fields.fixVersions?.[0]?.releaseDate ? new Date(e.fields.fixVersions[0].releaseDate) : null;
-        let readyForUATDate: Date | null = null;
-        if (e.changelog && Array.isArray(e.changelog.histories)) {
-          for (const h of e.changelog.histories) {
-            for (const item of h.items) {
-              if (item.field === 'status' && item.toString === 'READY_FOR_UAT') {
-                readyForUATDate = new Date(h.created);
-                break;
-              }
-            }
-            if (readyForUATDate) break;
-          }
-        }
-        let leadTimeDays: number | null = null;
-        if (created && releaseDate && !isNaN(created.getTime()) && !isNaN(releaseDate.getTime())) {
-          leadTimeDays = Math.round((releaseDate.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-          sumLeadTime += leadTimeDays;
-          countLeadTime++;
-        }
-        let leadTimeReadyForUAT: number | null = null;
-        if (created && readyForUATDate && !isNaN(created.getTime()) && !isNaN(readyForUATDate.getTime())) {
-          leadTimeReadyForUAT = Math.round((readyForUATDate.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-          sumLeadTimeReadyForUAT += leadTimeReadyForUAT;
-          countLeadTimeReadyForUAT++;
-        }
-        if (!leadTimeDays && !leadTimeReadyForUAT) {
-          skippedEpics.push({
-            key: e.key, summary: e.fields.summary, created: created?.toISOString().slice(0, 10) || null,
-            fixVersions: e.fields.fixVersions || [],
-            releaseDate: releaseDate ? releaseDate.toISOString().slice(0, 10) : null,
-            readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
-            reason: 'Mancano releaseDate e transizione READY_FOR_UAT',
-          });
-        } else {
-          outputEpics.push({
-            key: e.key, summary: e.fields.summary, created: created?.toISOString().slice(0, 10) || null,
-            fixVersions: e.fields.fixVersions || [],
-            releaseDate: releaseDate ? releaseDate.toISOString().slice(0, 10) : null,
-            readyForUATDate: readyForUATDate ? readyForUATDate.toISOString().slice(0, 10) : null,
-            leadTimeDays, leadTimeReadyForUAT,
-          });
-        }
-      }
-      res.json({
-        team: team || null, projectKey,
-        from: fromDate ? fromDate.toISOString().slice(0, 10) : null,
-        to: toDate ? toDate.toISOString().slice(0, 10) : null,
-        meanLeadTimeDays: countLeadTime > 0 ? +(sumLeadTime / countLeadTime).toFixed(2) : null,
-        meanLeadTimeReadyForUAT: countLeadTimeReadyForUAT > 0 ? +(sumLeadTimeReadyForUAT / countLeadTimeReadyForUAT).toFixed(2) : null,
-        epics: outputEpics, skippedEpics,
-      });
-    } catch (error: any) {
-      console.error('Error in /api/dora/lead-time-epic:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch lead time for epics' });
-    }
+      return fetchEpicsWithChangelog(userId, projectKey, team, from, to);
+    },
   });
+  app.get('/api/dora/lead-time-epic', isAuthenticated, leadTimeEpicHandler);
 
   // DORA: Change Failure Rate (Dual-metric: DORA + SEND)
   const changeFailureRateHandler = createChangeFailureRateHandler({
@@ -946,6 +864,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
   app.get('/api/dora/change-failure-rate', isAuthenticated, changeFailureRateHandler);
+
+  // DORA: Mean Time to Restore (SEND Prod BUG)
+  const meanTimeToRestoreHandler = createMeanTimeToRestoreHandler({
+    fetchSendProdBugsForMttr: async (
+      userId: string,
+      projectKey: string,
+      team?: string,
+      from?: string,
+      to?: string,
+    ) => {
+      const { fetchSendProdBugsForMttr } = await import('./jira-client');
+      return fetchSendProdBugsForMttr(userId, projectKey, team, from, to);
+    },
+  });
+  app.get('/api/dora/mean-time-to-restore', isAuthenticated, meanTimeToRestoreHandler);
 
   // JIRA credentials - Save (POST)
   app.post('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {

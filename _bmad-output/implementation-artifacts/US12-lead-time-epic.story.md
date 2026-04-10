@@ -4,7 +4,7 @@ created: 2026-04-09
 last_updated: 2026-04-09
 title: Lead Time for Changes (Epic)
 epic: Backend, API e Integrazione JIRA
-status: ready-for-dev
+status: review
 assignee: TBD
 ---
 
@@ -77,26 +77,26 @@ assignee: TBD
 
 
  [x] Implementa funzione di query JIRA per recuperare epiche e dati di stato (incluso changelog per READY_FOR_UAT)
- [ ] Calcola il lead time medio e dettaglio per ogni Epic (creazione → rilascio, creazione → READY_FOR_UAT) _(in corso)_
-- [ ] Gestisci errori, dati mancanti e casi limite (epiche senza data rilascio/transizione)
-- [ ] Aggiorna la documentazione tecnica con esempi di input/output
+ [x] Calcola il lead time medio e dettaglio per ogni Epic (creazione → rilascio, creazione → READY_FOR_UAT)
+- [x] Gestisci errori, dati mancanti e casi limite (epiche senza data rilascio/transizione)
+- [x] Aggiorna la documentazione tecnica con esempi di input/output
   - [2026-04-09] Avviata implementazione funzione di query JIRA per epiche e changelog (READY_FOR_UAT)
   - [2026-04-09] Endpoint /api/dora/lead-time-epic: parametri validati, fetch epiche/changelog integrato, output base conforme a specifica story/OpenAPI (senza calcolo)
 
-- [ ] Definisci o aggiorna la specifica OpenAPI per l’endpoint `/api/dora/lead-time-epic` (parametri, risposta, errori)
+- [x] Definisci o aggiorna la specifica OpenAPI per l’endpoint `/api/dora/lead-time-epic` (parametri, risposta, errori)
 
-- [ ] Analizza la specifica e definisci la struttura dell’endpoint `/api/dora/lead-time-epic`
+- [x] Analizza la specifica e definisci la struttura dell’endpoint `/api/dora/lead-time-epic`
 - [x] Implementa la logica di query JIRA per epiche, release e transizioni di stato
-- [ ] Calcola e restituisci la media e il dettaglio dei lead time (rilascio, READY_FOR_UAT)
-- [ ] Gestisci errori, dati mancanti e output chiaro
-- [ ] Aggiorna la documentazione tecnica e inserisci esempi
-- [ ] Implementa test automatici per:
-  - [ ] Parametri validi/invalidi
-  - [ ] Calcolo corretto dei lead time
-  - [ ] Gestione epiche senza data rilascio/transizione
-  - [ ] Output conforme alle specifiche
+- [x] Calcola e restituisci la media e il dettaglio dei lead time (rilascio, READY_FOR_UAT)
+- [x] Gestisci errori, dati mancanti e output chiaro
+- [x] Aggiorna la documentazione tecnica e inserisci esempi
+- [x] Implementa test automatici per:
+  - [x] Parametri validi/invalidi
+  - [x] Calcolo corretto dei lead time
+  - [x] Gestione epiche senza data rilascio/transizione
+  - [x] Output conforme alle specifiche
 
-- [ ] Definisci/aggiorna la specifica OpenAPI per la nuova funzionalità (endpoint, parametri, risposta, errori)
+- [x] Definisci/aggiorna la specifica OpenAPI per la nuova funzionalità (endpoint, parametri, risposta, errori)
 
 ---
 
@@ -104,17 +104,23 @@ Debug Log:
   - [2026-04-09] Endpoint REST /api/dora/lead-time-epic aggiunto in routes.ts (solo struttura, status 501)
   - [2026-04-09] Avviata implementazione funzione di query JIRA per epiche e changelog (READY_FOR_UAT)
   - [2026-04-09] Migrazione `fetchEpicsWithChangelog` all'Enhanced Search API `POST /rest/api/3/search/jql` con payload conforme (`nextPageToken`) e test client passato (502 epiche)
+  - [2026-04-10] Estratta logica endpoint in `createLeadTimeEpicHandler` con gestione errori strutturata e calcolo medie deterministico.
+  - [2026-04-10] Aggiunti test deterministici per calcolo lead time, gestione skipped epics e propagazione errori Jira.
 Completion Notes:
+  - US12 completata: endpoint lead-time-epic consolidato con handler dedicato, test coverage estesa e suite regressione verde.
 
 - server/routes.ts (nuovo endpoint REST)
 - server/jira-client.ts (funzione query epiche e changelog)
 - scripts/test-fetchEpicsWithChangelog.ts (test client JIRA per query epiche/changelog)
 - test/server/lead-time-epic.test.ts (test automatici)
 - README.md / docs (documentazione tecnica)
+- server/lead-time-epic-handler.ts (handler dedicato per route e logica di aggregazione)
+- server/lead-time-epic-handler.test.ts (test unitari handler e mapping errori)
 
 ## Change Log
 - 2026-04-09: Creazione story file per US12 Lead Time for Changes (Epic)
 - 2026-04-09: Migrazione client JIRA da API search deprecata a Enhanced Search API per `fetchEpicsWithChangelog`
+- 2026-04-10: Completata implementazione lead-time endpoint con handler dedicato e copertura test estesa.
 
 ## Status
-ready-for-dev
+review

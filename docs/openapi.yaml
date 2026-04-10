@@ -321,3 +321,116 @@ paths:
           description: Project key non trovato
         '500':
           description: Errore interno
+
+  /api/dora/mean-time-to-restore:
+    get:
+      summary: Calcola Mean Time to Restore (MTTR) per SEND Prod BUG
+      tags: [DORA]
+      parameters:
+        - in: query
+          name: projectKey
+          required: true
+          schema:
+            type: string
+          description: Project key JIRA
+        - in: query
+          name: team
+          required: false
+          schema:
+            type: string
+          description: Team opzionale
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Data inizio (ISO 8601)
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Data fine (ISO 8601)
+      responses:
+        '200':
+          description: MTTR calcolato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: string
+                    nullable: true
+                  projectKey:
+                    type: string
+                  from:
+                    type: string
+                    format: date
+                    nullable: true
+                  to:
+                    type: string
+                    format: date
+                    nullable: true
+                  mttrHours:
+                    type: number
+                    nullable: true
+                  p50Hours:
+                    type: number
+                    nullable: true
+                  p90Hours:
+                    type: number
+                    nullable: true
+                  totalIncidents:
+                    type: integer
+                  resolvedIncidents:
+                    type: integer
+                  unresolvedIncidents:
+                    type: integer
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        summary:
+                          type: string
+                          nullable: true
+                        created:
+                          type: string
+                        resolutionDate:
+                          type: string
+                        restoreHours:
+                          type: number
+                        issueType:
+                          type: string
+                          nullable: true
+                        status:
+                          type: string
+                          nullable: true
+                  skippedIssues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        summary:
+                          type: string
+                          nullable: true
+                        created:
+                          type: string
+                          nullable: true
+                        reason:
+                          type: string
+        '400':
+          description: Parametri mancanti o non validi
+        '401':
+          description: Credenziali JIRA non valide
+        '404':
+          description: Project key non trovato
+        '500':
+          description: Errore interno

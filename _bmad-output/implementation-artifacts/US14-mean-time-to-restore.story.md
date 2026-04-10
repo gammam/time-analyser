@@ -4,7 +4,7 @@ created: 2026-04-10
 last_updated: 2026-04-10
 title: Mean Time to Restore (MTTR) — SEND Prod BUG
 epic: Backend, API e Integrazione JIRA
-status: ready-for-dev
+status: ready-for-review
 assignee: TBD
 ---
 
@@ -109,35 +109,35 @@ so that I can track how quickly incidents are resolved over a selected period.
 
 ## Tasks / Subtasks
 
-- [ ] Define route contract and validation (AC: 1, 2, 7, 8, 9, 11)
-  - [ ] Add REST route `GET /api/dora/mean-time-to-restore` in `server/routes.ts` vicino agli endpoint DORA esistenti.
-  - [ ] Implement query param validation (`projectKey`, `from`, `to`) con stesso pattern di `deployment-frequency` e `change-failure-rate`.
-  - [ ] Return stable response envelope with aggregate fields and issue lists.
+- [x] Define route contract and validation (AC: 1, 2, 7, 8, 9, 11)
+  - [x] Add REST route `GET /api/dora/mean-time-to-restore` in `server/routes.ts` vicino agli endpoint DORA esistenti.
+  - [x] Implement query param validation (`projectKey`, `from`, `to`) con stesso pattern di `deployment-frequency` e `change-failure-rate`.
+  - [x] Return stable response envelope with aggregate fields and issue lists.
 
-- [ ] Implement Jira retrieval helper for MTTR (AC: 3, 4, 9)
-  - [ ] Add helper in `server/jira-client.ts` (es. `fetchSendProdBugsForMttr(...)`).
-  - [ ] Build dynamic JQL with `projectKey`, optional `team`, optional date filters.
-  - [ ] Query **only** `[SEND] Bug Prod` with fields needed for MTTR.
-  - [ ] Normalize structured errors (`auth`, `not_found`, `unknown`) exactly like existing helpers.
+- [x] Implement Jira retrieval helper for MTTR (AC: 3, 4, 9)
+  - [x] Add helper in `server/jira-client.ts` (es. `fetchSendProdBugsForMttr(...)`).
+  - [x] Build dynamic JQL with `projectKey`, optional `team`, optional date filters.
+  - [x] Query **only** `[SEND] Bug Prod` with fields needed for MTTR.
+  - [x] Normalize structured errors (`auth`, `not_found`, `unknown`) exactly like existing helpers.
 
-- [ ] Implement MTTR computation module (AC: 4, 5, 6, 8)
-  - [ ] Create dedicated function/module (es. `server/mean-time-to-restore.ts`) to compute per-issue restore hours.
-  - [ ] Split resolved vs unresolved issues.
-  - [ ] Compute `mttrHours` and optional `p50Hours`/`p90Hours` when resolved set is non-empty.
-  - [ ] Return `mttrHours = null` when no resolved incidents.
+- [x] Implement MTTR computation module (AC: 4, 5, 6, 8)
+  - [x] Create dedicated function/module (es. `server/mean-time-to-restore.ts`) to compute per-issue restore hours.
+  - [x] Split resolved vs unresolved issues.
+  - [x] Compute `mttrHours` and optional `p50Hours`/`p90Hours` when resolved set is non-empty.
+  - [x] Return `mttrHours = null` when no resolved incidents.
 
-- [ ] Add comprehensive automated tests (AC: 2, 5, 6, 8, 9, 11)
-  - [ ] Unit tests for MTTR math (hours diff, average, percentile boundaries).
-  - [ ] Route tests for missing `projectKey` and invalid dates.
-  - [ ] Test unresolved issues are excluded from MTTR and moved to `skippedIssues`.
-  - [ ] Test empty resolved set returns `mttrHours: null`.
-  - [ ] Test Jira `auth`/`not_found`/`unknown` propagation.
+- [x] Add comprehensive automated tests (AC: 2, 5, 6, 8, 9, 11)
+  - [x] Unit tests for MTTR math (hours diff, average, percentile boundaries).
+  - [x] Route tests for missing `projectKey` and invalid dates.
+  - [x] Test unresolved issues are excluded from MTTR and moved to `skippedIssues`.
+  - [x] Test empty resolved set returns `mttrHours: null`.
+  - [x] Test Jira `auth`/`not_found`/`unknown` propagation.
   - [ ] Optional E2E test with dedicated port (not 3000).
 
-- [ ] Update documentation (AC: 10)
-  - [ ] Update `README.md` MTTR section with endpoint and formula.
-  - [ ] Update `docs/openapi.yaml` schema for `/api/dora/mean-time-to-restore`.
-  - [ ] Add optional script under `scripts/` for real Jira MTTR query validation.
+- [x] Update documentation (AC: 10)
+  - [x] Update `README.md` MTTR section with endpoint and formula.
+  - [x] Update `docs/openapi.yaml` schema for `/api/dora/mean-time-to-restore`.
+  - [x] Add optional script under `scripts/` for real Jira MTTR query validation.
 
 ## Dev Notes
 
@@ -203,19 +203,36 @@ GPT-5.3-Codex
 ### Debug Log References
 
 - 2026-04-10: Story generated from DORA backend artifacts and existing endpoint patterns.
+- 2026-04-10: Implemented MTTR endpoint, Jira helper, aggregation module, tests, docs, and npm script alias.
 
 ### Completion Notes List
 
-- Story generated with SEND-specific MTTR scope (`[SEND] Bug Prod`) and implementation guardrails.
+- Implemented `GET /api/dora/mean-time-to-restore` with DORA-like validation and structured Jira error propagation.
+- Added Jira helper `fetchSendProdBugsForMttr` with strict `[SEND] Bug Prod` JQL scope and required fields.
+- Implemented deterministic MTTR aggregation (mttrHours, p50Hours, p90Hours, issues/skippedIssues split).
+- Added unit and handler tests for core AC coverage plus full suite execution.
+- Updated README and OpenAPI contracts and added `test:jira:mttr` helper script.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/US14-mean-time-to-restore.story.md`
+- `server/routes.ts`
+- `server/jira-client.ts`
+- `server/mean-time-to-restore.ts`
+- `server/mean-time-to-restore-handler.ts`
+- `server/mean-time-to-restore.test.ts`
+- `server/mean-time-to-restore-handler.test.ts`
+- `scripts/test-fetchSendProdBugsForMttr.ts`
+- `package.json`
+- `README.md`
+- `docs/openapi.yaml`
+- `server/jira-crypto.test.ts`
 
 ## Change Log
 
 - 2026-04-10: Created story file for Mean Time to Restore (MTTR) backend implementation.
+- 2026-04-10: Implemented endpoint + helper + aggregation + tests + docs for US14.
 
 ## Status
 
-ready-for-dev
+ready-for-review

@@ -229,6 +229,102 @@ export async function fetchProductionBugsForReleases(
   }
 }
 
+// Recupera i bug di produzione [SEND] Bug Prod per calcolo MTTR
+export async function fetchSendProdBugsForMttr(
+  userId: string,
+  projectKey: string,
+  team?: string,
+  from?: string,
+  to?: string,
+) {
+  try {
+    const { email, apiToken, host } = await getUserJiraCredentials(userId);
+    const normalizedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+    const url = `${normalizedHost}/rest/api/3/search/jql`;
+    const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+
+    let jql = `project = ${projectKey} AND issuetype = "[SEND] Bug Prod"`;
+    if (team) {
+      jql += ` AND team ~ "${team}"`;
+    }
+    if (from) {
+      jql += ` AND created >= "${from}"`;
+    }
+    if (to) {
+      jql += ` AND created <= "${to}"`;
+    }
+
+    const allIssues: any[] = [];
+    let nextPageToken: string | undefined;
+
+    do {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jql,
+          maxResults: 100,
+          fields: ['summary', 'created', 'resolutiondate', 'issuetype', 'status'],
+          fieldsByKeys: false,
+          nextPageToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const err: any = new Error(`Request failed with status code ${response.status}`);
+        err.status = response.status;
+        err.response = { status: response.status, data: errorData };
+        throw err;
+      }
+
+      const data: any = await response.json();
+      const pageIssues = data.issues || data.values || [];
+      allIssues.push(...pageIssues);
+      nextPageToken = data.nextPageToken;
+    } while (nextPageToken);
+
+    return allIssues
+      .filter((issue: any) => issue?.fields?.issuetype?.name === '[SEND] Bug Prod')
+      .map((issue: any) => ({
+        key: issue.key,
+        summary: issue?.fields?.summary || null,
+        created: issue?.fields?.created || null,
+        resolutionDate: issue?.fields?.resolutiondate || null,
+        issueType: issue?.fields?.issuetype?.name || null,
+        status: issue?.fields?.status?.name || null,
+      }));
+  } catch (error: any) {
+    const status = error?.response?.status || error?.status;
+    let structuredError;
+    if (status === 401 || status === 403) {
+      structuredError = {
+        type: 'auth',
+        message: 'Autenticazione JIRA fallita: token o credenziali non valide.',
+        details: error?.response?.data || error?.message || error,
+      };
+    } else if (status === 404) {
+      structuredError = {
+        type: 'not_found',
+        message: `ProjectKey o ID non valido: ${projectKey}`,
+        details: error?.response?.data || error?.message || error,
+      };
+    } else {
+      structuredError = {
+        type: 'unknown',
+        message: `Errore nella ricerca bug produzione JIRA per MTTR (status: ${status}): ${error?.message || 'Errore sconosciuto'}`,
+        details: error?.response?.data || error?.message || error,
+      };
+    }
+    console.error(`[JIRA] Errore nel recupero bug produzione per MTTR nel progetto ${projectKey}:`, structuredError);
+    throw structuredError;
+  }
+}
+
 import { storage } from './storage.ts';
 import { decryptJiraToken } from './jira-crypto.ts';
 // Recupera le credenziali JIRA per un dato userId dal database e le decifra

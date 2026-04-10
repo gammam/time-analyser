@@ -79,8 +79,15 @@ describe('E2E /api/dora/change-failure-rate', () => {
     expect(body.send).toHaveProperty('totalDeployments');
     expect(body.send).toHaveProperty('failedDeployments');
     expect(body.send).toHaveProperty('changeFailureRate');
+    expect(body.send).toHaveProperty('hotfixReleases');
     expect(Array.isArray(body.releases)).toBe(true);
     expect(Array.isArray(body.unmappedFailures)).toBe(true);
+
+    if (body.releases.length > 0) {
+      expect(body.releases[0]).toHaveProperty('isGaRelease');
+      expect(body.releases[0]).toHaveProperty('isHotfixRelease');
+      expect(body.releases[0]).not.toHaveProperty('isGaOrHotfix');
+    }
   });
 
   it('should return null changeFailureRate when totalDeployments is zero', async () => {

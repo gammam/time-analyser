@@ -12,8 +12,12 @@ type ProductionBugInput = {
   releaseNames: string[];
 };
 
-export function isGaOrHotfixRelease(name: string): boolean {
-  return /^ga/i.test(name) || /hotfix/i.test(name);
+export function isGaRelease(name: string): boolean {
+  return /^ga/i.test(name);
+}
+
+export function isHotfixRelease(name: string): boolean {
+  return /hotfix/i.test(name);
 }
 
 export function aggregateChangeFailureRate(
@@ -26,7 +30,8 @@ export function aggregateChangeFailureRate(
       id: release.id,
       name: release.name,
       releaseDate: release.releaseDate,
-      isGaOrHotfix: isGaOrHotfixRelease(release.name || ''),
+      isGaRelease: isGaRelease(release.name || ''),
+      isHotfixRelease: isHotfixRelease(release.name || ''),
       failureCount: 0,
       failureIssues: [],
     });
@@ -64,9 +69,10 @@ export function aggregateChangeFailureRate(
   const doraTotal = releases.length;
   const doraFailed = releases.filter((r: any) => r.failureCount > 0).length;
 
-  const sendReleases = releases.filter((r: any) => r.isGaOrHotfix);
-  const sendTotal = sendReleases.length;
-  const sendFailed = sendReleases.filter((r: any) => r.failureCount > 0).length;
+  const sendReleases = releases.filter((r: any) => r.isGaRelease || r.isHotfixRelease).length;
+  const hotfixReleases = releases.filter((r: any) => r.isHotfixRelease).length;
+  const sendFailures = releases.filter((r: any) => (r.isGaRelease || r.isHotfixRelease) && r.failureCount > 0).length;
+  // const sendFailed = sendReleases.filter((r: any) => r.failureCount > 0).length;
 
   return {
     dora: {
@@ -75,9 +81,10 @@ export function aggregateChangeFailureRate(
       changeFailureRate: doraTotal > 0 ? +((doraFailed / doraTotal) * 100).toFixed(2) : null,
     },
     send: {
-      totalDeployments: sendTotal,
-      failedDeployments: sendFailed,
-      changeFailureRate: sendTotal > 0 ? +((sendFailed / sendTotal) * 100).toFixed(2) : null,
+      totalDeployments: sendReleases,
+      failedDeployments: sendFailures,
+      changeFailureRate: sendReleases > 0 ? +((sendFailures / sendReleases) * 100).toFixed(2) : null,
+      hotfixReleases: hotfixReleases,
     },
     releases,
     unmappedFailures,

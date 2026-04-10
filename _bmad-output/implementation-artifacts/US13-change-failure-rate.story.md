@@ -33,7 +33,7 @@ so that the UI can show how often deployments cause failures.
   ```text
   changeFailureRateDora = (numero di release con almeno 1 "[SEND] Bug Prod" associato) / (numero totale di release) * 100
  
- changeFailureRateSend = (numero di release il cui nome inizia per GA con almeno 1 "[SEND] Bug Prod" associato) / (numero totale di release il cui nome iniziare per GA o HOTFIX) *100 
+ changeFailureRateSend = (numero di release GA o HOTFIX con almeno 1 "[SEND] Bug Prod" associato) / (numero totale di release GA o HOTFIX) * 100
   ```
 
 - **Algoritmo di riferimento per questa implementazione:**
@@ -70,15 +70,17 @@ so that the UI can show how often deployments cause failures.
     },
     "send": {
       "totalDeployments": 3,
-      "failedDeployments": 1,
-      "changeFailureRate": 33
+      "failedDeployments": 2,
+      "hotfixReleases": 1,
+      "changeFailureRate": 66.67
     },
     "releases": [
       {
         "id": "10010",
         "name": "GA.1.4.0",
         "releaseDate": "2026-03-05",
-        "isGaOrHotfix": true,
+        "isGaRelease": true,
+        "isHotfixRelease": false,
         "failureCount": 1,
         "failureIssues": [
           { "key": "PROJ-101", "issueType": "[SEND] Bug Prod", "created": "2026-03-06" }
@@ -88,7 +90,8 @@ so that the UI can show how often deployments cause failures.
         "id": "10011",
         "name": "1.4.1",
         "releaseDate": "2026-03-20",
-        "isGaOrHotfix": false,
+        "isGaRelease": false,
+        "isHotfixRelease": false,
         "failureCount": 1,
         "failureIssues": [
           { "key": "PROJ-119", "issueType": "[SEND] Bug Prod", "created": "2026-03-21" }
@@ -96,11 +99,14 @@ so that the UI can show how often deployments cause failures.
       },
       {
         "id": "10012",
-        "name": "GA.1.4.1",
+        "name": "HOTFIX-1.4.1",
         "releaseDate": "2026-03-25",
-        "isGaOrHotfix": true,
-        "failureCount": 0,
-        "failureIssues": []
+        "isGaRelease": false,
+        "isHotfixRelease": true,
+        "failureCount": 1,
+        "failureIssues": [
+          { "key": "PROJ-120", "issueType": "[SEND] Bug Prod", "created": "2026-03-26" }
+        ]
       }
     ],
     "unmappedFailures": [
@@ -124,9 +130,9 @@ so that the UI can show how often deployments cause failures.
 4. Solo le release con `released: true` e `releaseDate` valorizzato, comprese nell'intervallo richiesto, entrano nei denominatori.
 5. Il backend recupera da Jira **solo** i ticket failure di tipo `[SEND] Bug Prod` che abbiamo associata una delle release nel periodo richiesto tramite `Affects Version/s` (campi: `fields.versions` o `fields.affectedVersions`).
 6. Per la metrica **DORA**: `dora.failedDeployments` = numero di release (tutte) con almeno 1 `[SEND] Bug Prod` associato.
-7. Per la metrica **SEND**: `send.failedDeployments` = numero di release il cui nome inizia con `GA` o contiene `HOTFIX` e che hanno almeno 1 `[SEND] Bug Prod` associato; `send.totalDeployments` = numero totale di release il cui nome inizia con `GA` o contiene `HOTFIX`.
+7. Per la metrica **SEND**: `send.failedDeployments` = numero di release il cui nome inizia con `GA` o contiene `HOTFIX` e che hanno almeno 1 `[SEND] Bug Prod` associato; `send.totalDeployments` = numero totale di release il cui nome inizia con `GA` o contiene `HOTFIX`; `send.hotfixReleases` = numero totale di release HOTFIX nel periodo.
 8. `changeFailureRate` (sia DORA che SEND) è restituito come percentuale numerica arrotondata 2 decimali, calcolato solo se `totalDeployments > 0`; altrimenti il valore è `null`.
-9. L'output include: `dora.{totalDeployments, failedDeployments, changeFailureRate}`, `send.{totalDeployments, failedDeployments, changeFailureRate}`, dettaglio per release con flag `isGaOrHotfix`, e sezione `unmappedFailures` per i failure senza mapping.
+9. L'output include: `dora.{totalDeployments, failedDeployments, changeFailureRate}`, `send.{totalDeployments, failedDeployments, hotfixReleases, changeFailureRate}`, dettaglio per release con flag `isGaRelease` e `isHotfixRelease`, e sezione `unmappedFailures` per i failure senza mapping.
 10. In caso di errore Jira, projectKey non valido o credenziali errate, l'endpoint restituisce errore strutturato coerente con `/api/dora/deployment-frequency` e `/api/dora/lead-time-epic`.
 11. README e OpenAPI vengono aggiornati con formula per entrambe le metriche, parametri, esempio di risposta e spiegazione del tipo issue `[SEND] Bug Prod`.
 12. Esistono test automatici almeno per: validazione parametri, DORA vs SEND aggregazione corretta, nessun failure, molteplici failure su stessa release, release GA/HOTFIX vs non-GA, errori Jira, e comportamento con `totalDeployments = 0`.
@@ -150,7 +156,8 @@ so that the UI can show how often deployments cause failures.
   - [x] Map each `[SEND] Bug Prod` issue to releases via `Affects Version/s`; count release once even if multiple failures point to it.
   - [x] Compute `dora.failedDeployments` and `dora.changeFailureRate` for all releases.
   - [x] Compute `send.failedDeployments` and `send.changeFailureRate` for GA/HOTFIX releases only.
-  - [x] Add `isGaOrHotfix` flag to each release in response for transparency.
+  - [x] Add `isGaRelease` and `isHotfixRelease` flags to each release in response for transparency.
+  - [x] Add `send.hotfixReleases` to summarize HOTFIX releases in the selected period.
   - [x] Collect unmapped `[SEND] Bug Prod` issues in separate `unmappedFailures` section.
 - [x] Add comprehensive test coverage (AC: 2, 13)
   - [x] Add unit/integration Jest tests for missing `projectKey` and invalid date formats.
@@ -176,6 +183,7 @@ so that the UI can show how often deployments cause failures.
 - **Critical:** Query **only** issue type `[SEND] Bug Prod` for failures. This is the authoritative production-bug type in the target JIRA instance.
 - Support both `fields.versions` and `fields.affectedVersions` Jira fields for release mapping; normalize to a single approach in client helper.
 - Implement release name filtering for SEND metric: detect names starting with `GA` or containing `HOTFIX` case-insensitively.
+- SEND output includes a dedicated counter `hotfixReleases` to make HOTFIX contribution explicit.
 
 ### Architecture Compliance
 
@@ -264,6 +272,7 @@ GPT-5.4
 - 2026-04-10: Extracted dual-metric aggregation into `server/change-failure-rate-aggregation.ts` and covered AC 7/8/10 with deterministic unit tests.
 - 2026-04-10: Introduced injectable CFR route handler to support deterministic route-level tests for Jira error propagation.
 - 2026-04-10: Updated README and OpenAPI with dual-metric CFR contract and `[SEND] Bug Prod` rules.
+- 2026-04-10: Aligned SEND formula to GA/HOTFIX releases with failures, added/validated `send.hotfixReleases`, and updated API definition/tests.
 
 ### Completion Notes List
 
@@ -278,6 +287,8 @@ GPT-5.4
 - Task 4 completed: added deterministic route-handler tests for input validation, aggregation payload, and Jira auth/not_found/unknown status propagation.
 - Task 5 completed (core docs): README and OpenAPI updated with CFR endpoint contract, formulas, parameters, and error schema.
 - Validation executed: `npx jest server/change-failure-rate-handler.test.ts server/change-failure-rate-aggregation.test.ts server/change-failure-rate.test.ts --runInBand` passed (19/19).
+- Follow-up change: corrected SEND formula implementation guard (`sendReleases > 0`), aligned tests for SEND semantics, and added explicit `send.hotfixReleases` contract assertions.
+- Validation executed: `npx jest server/change-failure-rate-aggregation.test.ts server/change-failure-rate-handler.test.ts --runInBand` passed (15/15); `npx jest server/change-failure-rate.test.ts --runInBand` passed (4/4).
 
 ### File List
 
@@ -305,6 +316,7 @@ GPT-5.4
 - 2026-04-10: Completed Task 1 and Task 2 implementation with passing E2E test for `/api/dora/change-failure-rate`.
 - 2026-04-10: Completed Task 3 aggregation logic with dedicated deterministic unit tests.
 - 2026-04-10: Completed Task 4 comprehensive testing and Task 5 documentation updates.
+- 2026-04-10: Updated API definition and tests for SEND (`failed GA/HOTFIX releases / total GA/HOTFIX releases`) and `hotfixReleases` output.
 
 ## Status
 

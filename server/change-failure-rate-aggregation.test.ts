@@ -1,11 +1,14 @@
-import { aggregateChangeFailureRate, isGaOrHotfixRelease } from './change-failure-rate-aggregation';
+import { aggregateChangeFailureRate, isGaRelease, isHotfixRelease } from './change-failure-rate-aggregation';
 
 describe('change failure rate aggregation', () => {
-  it('detects GA/HOTFIX names case-insensitively', () => {
-    expect(isGaOrHotfixRelease('GA.1.4.0')).toBe(true);
-    expect(isGaOrHotfixRelease('ga-1.4.1')).toBe(true);
-    expect(isGaOrHotfixRelease('release-HOTFIX-123')).toBe(true);
-    expect(isGaOrHotfixRelease('1.4.2')).toBe(false);
+  it('detects GA and HOTFIX names with dedicated flags', () => {
+    expect(isGaRelease('GA.1.4.0')).toBe(true);
+    expect(isGaRelease('ga-1.4.1')).toBe(true);
+    expect(isGaRelease('HOTFIX-1.4.1')).toBe(false);
+
+    expect(isHotfixRelease('release-HOTFIX-123')).toBe(true);
+    expect(isHotfixRelease('hotfix-1.4.1')).toBe(true);
+    expect(isHotfixRelease('GA.1.4.0')).toBe(false);
   });
 
   it('computes DORA and SEND metrics correctly with mixed releases (AC 7)', () => {
@@ -49,6 +52,7 @@ describe('change failure rate aggregation', () => {
     expect(result.send.totalDeployments).toBe(2);
     expect(result.send.failedDeployments).toBe(2);
     expect(result.send.changeFailureRate).toBe(100);
+    expect(result.send.hotfixReleases).toBe(1);
   });
 
   it('counts one failed deployment once even with multiple bugs (AC 7)', () => {
@@ -73,8 +77,12 @@ describe('change failure rate aggregation', () => {
     const result = aggregateChangeFailureRate(releases, bugs);
 
     expect(result.releases[0].failureCount).toBe(2);
+    expect(result.releases[0].isGaRelease).toBe(true);
+    expect(result.releases[0].isHotfixRelease).toBe(false);
     expect(result.dora.failedDeployments).toBe(1);
     expect(result.send.failedDeployments).toBe(1);
+    expect(result.send.changeFailureRate).toBe(100);
+    expect(result.send.hotfixReleases).toBe(0);
   });
 
   it('returns null rates when total deployments are zero (AC 8)', () => {
@@ -100,6 +108,7 @@ describe('change failure rate aggregation', () => {
     expect(result.send.totalDeployments).toBe(1);
     expect(result.send.failedDeployments).toBe(0);
     expect(result.send.changeFailureRate).toBe(0);
+    expect(result.send.hotfixReleases).toBe(0);
   });
 
   it('collects unmapped failures separately (AC 10)', () => {
@@ -120,5 +129,6 @@ describe('change failure rate aggregation', () => {
     expect(result.unmappedFailures[0].key).toBe('PROJ-301');
     expect(result.dora.failedDeployments).toBe(0);
     expect(result.send.failedDeployments).toBe(0);
+    expect(result.send.hotfixReleases).toBe(0);
   });
 });

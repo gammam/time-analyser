@@ -262,6 +262,8 @@ paths:
                         type: integer
                       failedDeployments:
                         type: integer
+                      hotfixReleases:
+                        type: integer
                       changeFailureRate:
                         type: number
                         nullable: true
@@ -277,7 +279,9 @@ paths:
                         releaseDate:
                           type: string
                           format: date
-                        isGaOrHotfix:
+                        isGaRelease:
+                          type: boolean
+                        isHotfixRelease:
                           type: boolean
                         failureCount:
                           type: integer

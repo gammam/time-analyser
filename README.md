@@ -45,12 +45,13 @@ L'endpoint REST `/api/dora/change-failure-rate` restituisce due metriche:
 
 **Formula:**
 - `dora.changeFailureRate = failedDeployments / totalDeployments * 100`
-- `send.changeFailureRate = failedDeployments / totalDeployments * 100`
+- `send.changeFailureRate = failedDeployments / totalDeployments * 100` (solo su release GA/HOTFIX)
 
 **Regole di calcolo:**
 - Denominatore DORA: tutte le release con `released: true` e `releaseDate` valorizzato nell'intervallo.
 - Denominatore SEND: subset delle release DORA con nome che inizia con `GA` o contiene `HOTFIX` (case-insensitive).
 - Numeratore: release con almeno un issue Jira di tipo `[SEND] Bug Prod` mappato tramite `Affects Version/s`.
+- Numeratore SEND: release GA/HOTFIX con almeno un `[SEND] Bug Prod` associato.
 - Se `totalDeployments = 0`, `changeFailureRate = null`.
 
 **Campi Jira usati:**
@@ -71,7 +72,8 @@ L'endpoint REST `/api/dora/change-failure-rate` restituisce due metriche:
    },
    "send": {
       "totalDeployments": 3,
-      "failedDeployments": 1,
+      "failedDeployments": 2,
+      "hotfixReleases": 1,
       "changeFailureRate": 33.33
    },
    "releases": [
@@ -79,7 +81,8 @@ L'endpoint REST `/api/dora/change-failure-rate` restituisce due metriche:
          "id": "10010",
          "name": "GA.1.4.0",
          "releaseDate": "2026-03-05",
-         "isGaOrHotfix": true,
+         "isGaRelease": true,
+         "isHotfixRelease": false,
          "failureCount": 1,
          "failureIssues": [
             { "key": "PROJ-101", "issueType": "[SEND] Bug Prod", "created": "2026-03-06" }

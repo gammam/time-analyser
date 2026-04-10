@@ -88,6 +88,8 @@ describe('change failure rate handler', () => {
     expect(res.body.dora.failedDeployments).toBe(1);
     expect(res.body.send.totalDeployments).toBe(1);
     expect(res.body.send.failedDeployments).toBe(1);
+    expect(res.body.send.changeFailureRate).toBe(100);
+    expect(res.body.send.hotfixReleases).toBe(0);
     expect(res.body.unmappedFailures).toHaveLength(1);
   });
 

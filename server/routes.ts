@@ -10,6 +10,7 @@ import { setupAuth, isAuthenticated, isLocalAuthBypassed, getLocalDevUser } from
 import { getAuthUrl, getTokensFromCode } from "./google-oauth";
 import jwt from 'jsonwebtoken';
 import { encryptJiraToken, decryptJiraToken } from "./jira-crypto";
+import { createChangeFailureRateHandler } from "./change-failure-rate-handler";
 import { stringify } from "querystring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -927,143 +928,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DORA: Change Failure Rate (Dual-metric: DORA + SEND)
-  app.get('/api/dora/change-failure-rate', isAuthenticated, async (req: any, res: any) => {
-    try {
-      const userId = req.user.claims.sub;
-      const projectKey = typeof req.query.projectKey === 'string' ? req.query.projectKey : undefined;
-      const team = typeof req.query.team === 'string' ? req.query.team : undefined;
-      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
-      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-
-      // AC #2: Validate projectKey as required
-      if (!projectKey) {
-        return res.status(400).json({ error: 'Missing or invalid projectKey' });
-      }
-
-      // AC #2: Validate date formats
-      let fromDate: Date | undefined;
-      let toDate: Date | undefined;
-      if (from) {
-        const d = new Date(from);
-        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid from date' });
-        fromDate = d;
-      }
-      if (to) {
-        const d = new Date(to);
-        if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid to date' });
-        toDate = d;
-      }
-
-      const { fetchProjectVersionsRaw, fetchProductionBugsForReleases } = await import('./jira-client');
-      const versions = await fetchProjectVersionsRaw(userId, projectKey);
-      const versionList = Array.isArray(versions)
-        ? versions
-        : (Array.isArray((versions as any)?.values) ? (versions as any).values : []);
-
-      // AC #4: only released versions with releaseDate in the requested interval
-      const filteredReleases = versionList.filter((v: any) => {
-        if (!v?.released || !v?.releaseDate) return false;
-        const relDate = new Date(v.releaseDate);
-        if (isNaN(relDate.getTime())) return false;
-        if (fromDate && relDate < fromDate) return false;
-        if (toDate && relDate > toDate) return false;
-        return true;
-      });
-
-      const releaseNames = filteredReleases
-        .map((v: any) => v?.name)
-        .filter((name: any) => typeof name === 'string' && name.length > 0);
-
-      // AC #5: retrieve only [SEND] Bug Prod issues, dynamically filtered by Affects Version/s
-      const productionBugs = await fetchProductionBugsForReleases(
-        userId,
-        projectKey,
-        releaseNames,
-        team,
-        from,
-        to,
-      );
-
-      const releaseIndex = new Map<string, any>();
-      for (const release of filteredReleases) {
-        releaseIndex.set(release.name, {
-          id: release.id,
-          name: release.name,
-          releaseDate: release.releaseDate,
-          isGaOrHotfix: /^ga/i.test(release.name || '') || /hotfix/i.test(release.name || ''),
-          failureCount: 0,
-          failureIssues: [],
-        });
-      }
-
-      const unmappedFailures: any[] = [];
-      for (const bug of productionBugs) {
-        let mapped = false;
-        for (const releaseName of bug.releaseNames || []) {
-          const release = releaseIndex.get(releaseName);
-          if (!release) continue;
-          mapped = true;
-          release.failureIssues.push({
-            key: bug.key,
-            issueType: bug.issueType,
-            created: bug.created,
-          });
-        }
-        if (!mapped) {
-          unmappedFailures.push({
-            key: bug.key,
-            summary: bug.summary,
-            created: bug.created,
-            reason: 'No Affects Version/s value found',
-          });
-        }
-      }
-
-      const releases = Array.from(releaseIndex.values()).map((release: any) => ({
-        ...release,
-        failureCount: release.failureIssues.length,
-      }));
-
-      const doraTotal = releases.length;
-      const doraFailed = releases.filter((r: any) => r.failureCount > 0).length;
-      const sendReleases = releases.filter((r: any) => r.isGaOrHotfix);
-      const sendTotal = sendReleases.length;
-      const sendFailed = sendReleases.filter((r: any) => r.failureCount > 0).length;
-
-      const doraMetrics = {
-        totalDeployments: doraTotal,
-        failedDeployments: doraFailed,
-        changeFailureRate: doraTotal > 0 ? +((doraFailed / doraTotal) * 100).toFixed(2) : null,
-      };
-
-      const sendMetrics = {
-        totalDeployments: sendTotal,
-        failedDeployments: sendFailed,
-        changeFailureRate: sendTotal > 0 ? +((sendFailed / sendTotal) * 100).toFixed(2) : null,
-      };
-
-      // AC #9: Return nested dora and send sub-objects
-      res.json({
-        team: team || null,
-        projectKey,
-        from: fromDate ? fromDate.toISOString().slice(0, 10) : null,
-        to: toDate ? toDate.toISOString().slice(0, 10) : null,
-        dora: doraMetrics,
-        send: sendMetrics,
-        releases,
-        unmappedFailures,
-      });
-    } catch (err: any) {
-      // AC #10: Structured error handling consistent with other DORA endpoints
-      if (err && err.type && err.message) {
-        res.status(err.type === 'auth' ? 401 : err.type === 'not_found' ? 404 : 500).json({
-          error: err.message, type: err.type, details: err.details
-        });
-      } else {
-        res.status(500).json({ error: err?.message || 'Failed to fetch change failure rate' });
-      }
-    }
+  const changeFailureRateHandler = createChangeFailureRateHandler({
+    fetchProjectVersionsRaw: async (userId: string, projectKey: string) => {
+      const { fetchProjectVersionsRaw } = await import('./jira-client');
+      return fetchProjectVersionsRaw(userId, projectKey);
+    },
+    fetchProductionBugsForReleases: async (
+      userId: string,
+      projectKey: string,
+      releaseNames: string[],
+      team?: string,
+      from?: string,
+      to?: string,
+    ) => {
+      const { fetchProductionBugsForReleases } = await import('./jira-client');
+      return fetchProductionBugsForReleases(userId, projectKey, releaseNames, team, from, to);
+    },
   });
+  app.get('/api/dora/change-failure-rate', isAuthenticated, changeFailureRateHandler);
 
   // JIRA credentials - Save (POST)
   app.post('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {

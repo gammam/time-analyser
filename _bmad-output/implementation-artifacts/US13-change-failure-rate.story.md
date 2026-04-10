@@ -143,27 +143,27 @@ so that the UI can show how often deployments cause failures.
   - [x] Add a Jira client function `fetchProductionBugsForReleases(...)` to query **only** `[SEND] Bug Prod` issues with dynamic JQL filtering by `Affects Version/s`.
   - [x] Request fields: `key`, `summary`, `created`, `issuetype` (must equal `[SEND] Bug Prod`), `versions` / `affectedVersions`.
   - [x] Normalize structured errors exactly as done for other Jira client helpers.
-- [ ] Implement dual-metric aggregation logic (AC: 7, 8, 10)
-  - [ ] Filter releases by `released: true` and `releaseDate` in interval.
-  - [ ] Compute `dora.totalDeployments` = all released versions in interval.
-  - [ ] Compute `send.totalDeployments` = released versions whose name starts with `GA` or contains `HOTFIX`.
-  - [ ] Map each `[SEND] Bug Prod` issue to releases via `Affects Version/s`; count release once even if multiple failures point to it.
-  - [ ] Compute `dora.failedDeployments` and `dora.changeFailureRate` for all releases.
-  - [ ] Compute `send.failedDeployments` and `send.changeFailureRate` for GA/HOTFIX releases only.
-  - [ ] Add `isGaOrHotfix` flag to each release in response for transparency.
-  - [ ] Collect unmapped `[SEND] Bug Prod` issues in separate `unmappedFailures` section.
-- [ ] Add comprehensive test coverage (AC: 2, 13)
-  - [ ] Add unit/integration Jest tests for missing `projectKey` and invalid date formats.
-  - [ ] Test DORA vs SEND aggregation: separate GA/HOTFIX from other releases.
-  - [ ] Test no releases, no failures, multiple failures on same release counted once.
-  - [ ] Test unmapped failures collection and reporting.
-  - [ ] Test behavior when `totalDeployments = 0` (both DORA and SEND).
-  - [ ] Test Jira auth/404/500 errors propagated through route.
-  - [ ] If adding E2E test, isolate to dedicated port (not 3000) like lead-time-epic test.
-- [ ] Update technical documentation (AC: 12)
-  - [ ] Update `README.md` with both DORA and SEND formulas, endpoint behavior, and `[SEND] Bug Prod` issue type explanation.
-  - [ ] Update `docs/openapi.yaml` with parameters, dual-metric response schema, and error schema.
-  - [ ] Add optional script under `scripts/` to validate `[SEND] Bug Prod` query against real Jira.
+- [x] Implement dual-metric aggregation logic (AC: 7, 8, 10)
+  - [x] Filter releases by `released: true` and `releaseDate` in interval.
+  - [x] Compute `dora.totalDeployments` = all released versions in interval.
+  - [x] Compute `send.totalDeployments` = released versions whose name starts with `GA` or contains `HOTFIX`.
+  - [x] Map each `[SEND] Bug Prod` issue to releases via `Affects Version/s`; count release once even if multiple failures point to it.
+  - [x] Compute `dora.failedDeployments` and `dora.changeFailureRate` for all releases.
+  - [x] Compute `send.failedDeployments` and `send.changeFailureRate` for GA/HOTFIX releases only.
+  - [x] Add `isGaOrHotfix` flag to each release in response for transparency.
+  - [x] Collect unmapped `[SEND] Bug Prod` issues in separate `unmappedFailures` section.
+- [x] Add comprehensive test coverage (AC: 2, 13)
+  - [x] Add unit/integration Jest tests for missing `projectKey` and invalid date formats.
+  - [x] Test DORA vs SEND aggregation: separate GA/HOTFIX from other releases.
+  - [x] Test no releases, no failures, multiple failures on same release counted once.
+  - [x] Test unmapped failures collection and reporting.
+  - [x] Test behavior when `totalDeployments = 0` (both DORA and SEND).
+  - [x] Test Jira auth/404/500 errors propagated through route.
+  - [x] If adding E2E test, isolate to dedicated port (not 3000) like lead-time-epic test.
+- [x] Update technical documentation (AC: 12)
+  - [x] Update `README.md` with both DORA and SEND formulas, endpoint behavior, and `[SEND] Bug Prod` issue type explanation.
+  - [x] Update `docs/openapi.yaml` with parameters, dual-metric response schema, and error schema.
+  - [x] Add optional script under `scripts/` to validate `[SEND] Bug Prod` query against real Jira.
 
 ## Dev Notes
 
@@ -261,6 +261,9 @@ GPT-5.4
 - 2026-04-10: Reused repository knowledge from existing DORA endpoints, tests, and documentation updates.
 - 2026-04-10: Added E2E test for change-failure-rate aligned to lead-time E2E pattern (spawn + fetch + dedicated port 3102).
 - 2026-04-10: Implemented Jira helper `fetchProductionBugsForReleases(...)` and connected CFR route to real Jira versions + `[SEND] Bug Prod` mapping.
+- 2026-04-10: Extracted dual-metric aggregation into `server/change-failure-rate-aggregation.ts` and covered AC 7/8/10 with deterministic unit tests.
+- 2026-04-10: Introduced injectable CFR route handler to support deterministic route-level tests for Jira error propagation.
+- 2026-04-10: Updated README and OpenAPI with dual-metric CFR contract and `[SEND] Bug Prod` rules.
 
 ### Completion Notes List
 
@@ -270,6 +273,11 @@ GPT-5.4
 - Task 2 completed: Jira retrieval implemented with dynamic JQL on `[SEND] Bug Prod` and `affectedVersion`, normalized mapping from `fields.versions` + `fields.affectedVersions`.
 - Validation executed: `npx jest server/change-failure-rate.test.ts --runInBand` passed (4/4).
 - Repository-wide `npm run check` still reports pre-existing unrelated errors in `server/jira-client-smoketest.ts` and `server/jira-crypto.test.ts`.
+- Task 3 completed: aggregation logic centralized and validated with deterministic scenarios (mixed GA/non-GA, multiple bugs on same release, zero deployments, unmapped failures).
+- Validation executed: `npx jest server/change-failure-rate-aggregation.test.ts --runInBand` passed (5/5).
+- Task 4 completed: added deterministic route-handler tests for input validation, aggregation payload, and Jira auth/not_found/unknown status propagation.
+- Task 5 completed (core docs): README and OpenAPI updated with CFR endpoint contract, formulas, parameters, and error schema.
+- Validation executed: `npx jest server/change-failure-rate-handler.test.ts server/change-failure-rate-aggregation.test.ts server/change-failure-rate.test.ts --runInBand` passed (19/19).
 
 ### File List
 
@@ -277,6 +285,13 @@ GPT-5.4
 - `server/routes.ts`
 - `server/jira-client.ts`
 - `server/change-failure-rate.test.ts`
+- `server/change-failure-rate-aggregation.ts`
+- `server/change-failure-rate-aggregation.test.ts`
+- `server/change-failure-rate-handler.ts`
+- `server/change-failure-rate-handler.test.ts`
+- `README.md`
+- `docs/openapi.yaml`
+- `scripts/test-fetchProductionBugsForReleases.ts`
 
 ## Change Log
 
@@ -288,6 +303,8 @@ GPT-5.4
   - Tasks restructured to emphasize `[SEND] Bug Prod` query and dual aggregation
   - Open questions consolidated; GA/HOTFIX naming detection strategy moved to clarifications
 - 2026-04-10: Completed Task 1 and Task 2 implementation with passing E2E test for `/api/dora/change-failure-rate`.
+- 2026-04-10: Completed Task 3 aggregation logic with dedicated deterministic unit tests.
+- 2026-04-10: Completed Task 4 comprehensive testing and Task 5 documentation updates.
 
 ## Status
 

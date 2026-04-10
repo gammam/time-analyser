@@ -31,6 +31,83 @@ GET /api/dora/deployment-frequency?projectKey=PROJ&from=2026-04-01&to=2026-04-08
 - 400 se mancano parametri obbligatori o date non valide
 - 401/404/500 per errori autenticazione, projectKey errato, errori JIRA
 
+## 🚨 Change Failure Rate (DORA + SEND)
+
+L'endpoint REST `/api/dora/change-failure-rate` restituisce due metriche:
+- `dora`: change failure rate su tutte le release nel periodo.
+- `send`: change failure rate su sole release GA/HOTFIX nel periodo.
+
+**Parametri:**
+- `projectKey` (obbligatorio)
+- `team` (opzionale)
+- `from` (opzionale, ISO 8601)
+- `to` (opzionale, ISO 8601)
+
+**Formula:**
+- `dora.changeFailureRate = failedDeployments / totalDeployments * 100`
+- `send.changeFailureRate = failedDeployments / totalDeployments * 100`
+
+**Regole di calcolo:**
+- Denominatore DORA: tutte le release con `released: true` e `releaseDate` valorizzato nell'intervallo.
+- Denominatore SEND: subset delle release DORA con nome che inizia con `GA` o contiene `HOTFIX` (case-insensitive).
+- Numeratore: release con almeno un issue Jira di tipo `[SEND] Bug Prod` mappato tramite `Affects Version/s`.
+- Se `totalDeployments = 0`, `changeFailureRate = null`.
+
+**Campi Jira usati:**
+- Release/versioni: `id`, `name`, `released`, `releaseDate`, `archived`
+- Failure issues: `key`, `fields.summary`, `fields.created`, `fields.issuetype`, `fields.versions`, `fields.affectedVersions`
+
+**Output esempio:**
+```json
+{
+   "team": "TeamA",
+   "projectKey": "PROJ",
+   "from": "2026-03-01",
+   "to": "2026-03-31",
+   "dora": {
+      "totalDeployments": 5,
+      "failedDeployments": 2,
+      "changeFailureRate": 40
+   },
+   "send": {
+      "totalDeployments": 3,
+      "failedDeployments": 1,
+      "changeFailureRate": 33.33
+   },
+   "releases": [
+      {
+         "id": "10010",
+         "name": "GA.1.4.0",
+         "releaseDate": "2026-03-05",
+         "isGaOrHotfix": true,
+         "failureCount": 1,
+         "failureIssues": [
+            { "key": "PROJ-101", "issueType": "[SEND] Bug Prod", "created": "2026-03-06" }
+         ]
+      }
+   ],
+   "unmappedFailures": [
+      {
+         "key": "PROJ-130",
+         "summary": "Production issue without version mapping",
+         "created": "2026-03-28",
+         "reason": "No Affects Version/s value found"
+      }
+   ]
+}
+```
+
+**Esempio chiamata:**
+```
+GET /api/dora/change-failure-rate?projectKey=PROJ&from=2026-03-01&to=2026-03-31
+```
+
+**Gestione errori:**
+- 400 se `projectKey` manca o date non valide
+- 401 per credenziali JIRA non valide
+- 404 per `projectKey` non trovato
+- 500 per errori interni/JIRA non classificati
+
 # ProdBuddy
 
 Your friendly productivity assistant that evaluates meeting effectiveness and predicts JIRA task completion based on available time and context switching overhead.

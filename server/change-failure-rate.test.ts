@@ -65,10 +65,10 @@ describe('E2E /api/dora/change-failure-rate', () => {
 
   it('should return 200 and valid dual-metric structure for a valid request', async () => {
     const res = await fetch(
-      `${baseUrl}/api/dora/change-failure-rate?projectKey=PN&from=2026-03-01&to=2026-03-31`
+      `${baseUrl}/api/dora/change-failure-rate?projectKey=PN&from=2026-01-01&to=2026-03-31`
     );
     const body = await res.json();
-
+    console.log('Response:', JSON.stringify(body, null, 2));
     expect(res.status).toBe(200);
     expect(body).toHaveProperty('projectKey', 'PN');
     expect(body).toHaveProperty('dora');

@@ -1,27 +1,127 @@
-                    skippedEpics:
-                      type: array
-                      description: Epiche escluse dal calcolo per dati mancanti
-                      items:
-                        type: object
-                        properties:
-                          key:
-                            type: string
-                          summary:
-                            type: string
-                          created:
-                            type: string
-                            format: date
-                          releaseDate:
-                            type: string
-                            format: date
-                            nullable: true
-                          readyForUATDate:
-                            type: string
-                            format: date
-                            nullable: true
-                          reason:
-                            type: string
-                            description: Motivo esclusione (es. mancano releaseDate e transizione READY_FOR_UAT)
+openapi: 3.0.3
+info:
+  title: ProdBuddy Backend API
+  version: 1.0.0
+  description: API per integrazioni, credenziali e metriche DORA
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/jira/credentials:
+    post:
+      summary: Salva le credenziali JIRA per l'utente autenticato
+      tags: [JIRA]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jiraEmail, jiraApiToken, jiraHost, jiraEncryptionKey]
+              properties:
+                jiraEmail:
+                  type: string
+                jiraApiToken:
+                  type: string
+                jiraHost:
+                  type: string
+                  example: https://pagopa.atlassian.net
+                jiraEncryptionKey:
+                  type: string
+      responses:
+        '200':
+          description: Credenziali salvate con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          description: Parametri mancanti
+        '500':
+          description: Errore interno
+    get:
+      summary: Recupera info sulle credenziali JIRA (senza token)
+      tags: [JIRA]
+      responses:
+        '200':
+          description: Info credenziali trovate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jiraEmail:
+                    type: string
+                  jiraHost:
+                    type: string
+                  hasToken:
+                    type: boolean
+        '404':
+          description: Nessuna credenziale trovata
+        '500':
+          description: Errore interno
+
+  /api/dora/deployment-frequency:
+    get:
+      summary: Calcola la Deployment Frequency
+      tags: [DORA]
+      parameters:
+        - in: query
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: team
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Deployment frequency calcolata con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: string
+                    nullable: true
+                  projectKey:
+                    type: string
+                  from:
+                    type: string
+                    format: date
+                    nullable: true
+                  to:
+                    type: string
+                    format: date
+                    nullable: true
+                  deploymentFrequency:
+                    type: integer
+        '400':
+          description: Parametri mancanti o non validi
+        '401':
+          description: Non autorizzato
+        '404':
+          description: Project key non trovato
+        '500':
+          description: Errore interno
+
   /api/dora/lead-time-epic:
     get:
       summary: Calcola il Lead Time for Changes delle epiche
@@ -32,27 +132,23 @@
           required: true
           schema:
             type: string
-          description: Project key JIRA
         - in: query
           name: team
           required: false
           schema:
             type: string
-          description: Nome team (opzionale)
         - in: query
           name: from
           required: false
           schema:
             type: string
             format: date
-          description: Data inizio periodo (ISO 8601, opzionale)
         - in: query
           name: to
           required: false
           schema:
             type: string
             format: date
-          description: Data fine periodo (ISO 8601, opzionale)
       responses:
         '200':
           description: Lead time calcolato con successo
@@ -76,10 +172,128 @@
                     nullable: true
                   meanLeadTimeDays:
                     type: number
+                    nullable: true
                   meanLeadTimeReadyForUAT:
                     type: number
                     nullable: true
                   epics:
+                    type: array
+                    items:
+                      type: object
+                  skippedEpics:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Parametri mancanti o non validi
+        '401':
+          description: Non autorizzato
+        '404':
+          description: Project key non trovato
+        '500':
+          description: Errore interno
+
+  /api/dora/change-failure-rate:
+    get:
+      summary: Calcola Change Failure Rate DORA e SEND
+      tags: [DORA]
+      parameters:
+        - in: query
+          name: projectKey
+          required: true
+          schema:
+            type: string
+          description: Project key JIRA
+        - in: query
+          name: team
+          required: false
+          schema:
+            type: string
+          description: Team opzionale
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Data inizio (ISO 8601)
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Data fine (ISO 8601)
+      responses:
+        '200':
+          description: Change Failure Rate calcolato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  team:
+                    type: string
+                    nullable: true
+                  projectKey:
+                    type: string
+                  from:
+                    type: string
+                    format: date
+                    nullable: true
+                  to:
+                    type: string
+                    format: date
+                    nullable: true
+                  dora:
+                    type: object
+                    properties:
+                      totalDeployments:
+                        type: integer
+                      failedDeployments:
+                        type: integer
+                      changeFailureRate:
+                        type: number
+                        nullable: true
+                  send:
+                    type: object
+                    properties:
+                      totalDeployments:
+                        type: integer
+                      failedDeployments:
+                        type: integer
+                      changeFailureRate:
+                        type: number
+                        nullable: true
+                  releases:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        releaseDate:
+                          type: string
+                          format: date
+                        isGaOrHotfix:
+                          type: boolean
+                        failureCount:
+                          type: integer
+                        failureIssues:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              key:
+                                type: string
+                              issueType:
+                                type: string
+                              created:
+                                type: string
+                                format: date
+                  unmappedFailures:
                     type: array
                     items:
                       type: object
@@ -88,92 +302,18 @@
                           type: string
                         summary:
                           type: string
+                          nullable: true
                         created:
                           type: string
                           format: date
-                        releaseDate:
+                          nullable: true
+                        reason:
                           type: string
-                          format: date
-                          nullable: true
-                        readyForUATDate:
-                          type: string
-                          format: date
-                          nullable: true
-                        leadTimeDays:
-                          type: number
-                        leadTimeReadyForUAT:
-                          type: number
-                          nullable: true
         '400':
           description: Parametri mancanti o non validi
         '401':
-          description: Non autorizzato
-        '500':
-          description: Errore interno
-openapi: 3.0.3
-info:
-  title: ProdBuddy Backend API
-  version: 1.0.0
-  description: API per la gestione delle integrazioni, credenziali e metriche DORA
-servers:
-  - url: http://localhost:3000
-paths:
-  /api/jira/credentials:
-    post:
-      summary: Salva le credenziali JIRA per l'utente autenticato
-      tags: [JIRA]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - jiraEmail
-                - jiraApiToken
-                - jiraHost
-              properties:
-                jiraEmail:
-                  type: string
-                  example: user@email.com
-                jiraApiToken:
-                  type: string
-                  example: atlassian-api-token
-                jiraHost:
-                  type: string
-                  example: https://pagopa.atlassian.net
-      responses:
-        '200':
-          description: Credenziali salvate con successo
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-        '400':
-          description: Parametri mancanti
-        '500':
-          description: Errore interno
-    get:
-      summary: Recupera info sulle credenziali JIRA (mai il token)
-      tags: [JIRA]
-      responses:
-        '200':
-          description: Info credenziali trovate
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  jiraEmail:
-                    type: string
-                  jiraHost:
-                    type: string
-                  hasToken:
-                    type: boolean
+          description: Credenziali JIRA non valide
         '404':
-          description: Nessuna credenziale trovata
+          description: Project key non trovato
         '500':
           description: Errore interno

@@ -204,13 +204,16 @@ GPT-5.3-Codex
 
 - 2026-04-10: Story generated from DORA backend artifacts and existing endpoint patterns.
 - 2026-04-10: Implemented MTTR endpoint, Jira helper, aggregation module, tests, docs, and npm script alias.
+- 2026-04-10: Updated MTTR Jira helper to derive `resolutionDate` from changelog transition to `Completata` when `fields.resolutiondate` is missing.
 
 ### Completion Notes List
 
 - Implemented `GET /api/dora/mean-time-to-restore` with DORA-like validation and structured Jira error propagation.
 - Added Jira helper `fetchSendProdBugsForMttr` with strict `[SEND] Bug Prod` JQL scope and required fields.
+- Added MTTR fallback resolution logic: when `fields.resolutiondate` is null, use changelog timestamp of latest status transition to `Completata`.
 - Implemented deterministic MTTR aggregation (mttrHours, p50Hours, p90Hours, issues/skippedIssues split).
 - Added unit and handler tests for core AC coverage plus full suite execution.
+- Added dedicated unit tests for changelog-to-resolutionDate extraction logic in Jira helper.
 - Updated README and OpenAPI contracts and added `test:jira:mttr` helper script.
 
 ### File List
@@ -227,11 +230,15 @@ GPT-5.3-Codex
 - `README.md`
 - `docs/openapi.yaml`
 - `server/jira-crypto.test.ts`
+- `server/jira-client.mttr.test.ts`
+- `scripts/mttr-cli-args.ts`
+- `scripts/mttr-cli-args.test.ts`
 
 ## Change Log
 
 - 2026-04-10: Created story file for Mean Time to Restore (MTTR) backend implementation.
 - 2026-04-10: Implemented endpoint + helper + aggregation + tests + docs for US14.
+- 2026-04-10: Added changelog fallback (`status -> Completata`) for MTTR resolutionDate plus tests and documentation updates.
 
 ## Status
 

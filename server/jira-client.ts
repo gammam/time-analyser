@@ -1,4 +1,7 @@
 // Recupera tutte le epiche di un progetto/team con changelog (per READY_FOR_UAT)
+import { deriveResolutionDateFromChangelog } from './mttr-resolution-date.ts';
+
+// Recupera tutte le epiche di un progetto/team con changelog (per READY_FOR_UAT)
 export async function fetchEpicsWithChangelog(userId: string, projectKey: string, team?: string, from?: string, to?: string) {
   try {
     const { email, apiToken, host } = await getUserJiraCredentials(userId);
@@ -256,8 +259,23 @@ export async function fetchSendProdBugsForMttr(
 
     const allIssues: any[] = [];
     let nextPageToken: string | undefined;
+    const debugMttrPayload = process.env.DEBUG_JIRA_MTTR_PAYLOAD === '1';
+    let debugPageIndex = 0;
 
     do {
+      const body = {
+        jql,
+        maxResults: 100,
+        fields: ['summary', 'created', 'resolutiondate', 'issuetype', 'status'],
+        expand: 'changelog',
+        fieldsByKeys: false,
+        nextPageToken,
+      };
+
+      if (debugMttrPayload) {
+        console.log('[JIRA][MTTR] Request payload:', JSON.stringify(body));
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -265,13 +283,7 @@ export async function fetchSendProdBugsForMttr(
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          jql,
-          maxResults: 100,
-          fields: ['summary', 'created', 'resolutiondate', 'issuetype', 'status'],
-          fieldsByKeys: false,
-          nextPageToken,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -284,8 +296,24 @@ export async function fetchSendProdBugsForMttr(
 
       const data: any = await response.json();
       const pageIssues = data.issues || data.values || [];
+
+      if (debugMttrPayload) {
+        const firstIssue = pageIssues[0];
+        const firstIssueHasChangelog = Array.isArray(firstIssue?.changelog?.histories);
+        console.log(
+          '[JIRA][MTTR] Response page summary:',
+          JSON.stringify({
+            page: debugPageIndex,
+            issues: pageIssues.length,
+            hasNextPageToken: !!data.nextPageToken,
+            firstIssueHasChangelog,
+          }),
+        );
+      }
+
       allIssues.push(...pageIssues);
       nextPageToken = data.nextPageToken;
+      debugPageIndex += 1;
     } while (nextPageToken);
 
     return allIssues
@@ -294,7 +322,7 @@ export async function fetchSendProdBugsForMttr(
         key: issue.key,
         summary: issue?.fields?.summary || null,
         created: issue?.fields?.created || null,
-        resolutionDate: issue?.fields?.resolutiondate || null,
+        resolutionDate: issue?.fields?.resolutiondate || deriveResolutionDateFromChangelog(issue?.changelog),
         issueType: issue?.fields?.issuetype?.name || null,
         status: issue?.fields?.status?.name || null,
       }));

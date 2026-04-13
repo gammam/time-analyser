@@ -325,6 +325,10 @@ paths:
   /api/dora/mean-time-to-restore:
     get:
       summary: Calcola Mean Time to Restore (MTTR) per SEND Prod BUG
+      description: >-
+        Per ogni issue [SEND] Bug Prod, resolutionDate usa fields.resolutiondate;
+        se assente, viene derivata dal changelog prendendo la data dell'ultima
+        transizione di stato a "Completata".
       tags: [DORA]
       parameters:
         - in: query
@@ -403,6 +407,9 @@ paths:
                           type: string
                         resolutionDate:
                           type: string
+                          description: >-
+                            Resolution date Jira o fallback da changelog (ultima
+                            transizione stato a "Completata").
                         restoreHours:
                           type: number
                         issueType:

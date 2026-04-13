@@ -9,7 +9,7 @@ describe('parseMttrCliArgs', () => {
       userId: 'local-dev-user',
       projectKey: 'PN',
       team: undefined,
-      from: '2026-03-01',
+      from: '2026-01-01',
       to: '2026-03-31',
     });
   });

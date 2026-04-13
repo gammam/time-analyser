@@ -127,7 +127,8 @@ L'endpoint REST `/api/dora/mean-time-to-restore` calcola il tempo medio di ripri
 
 **Regole di calcolo:**
 - Scope esclusivo: issue Jira con `issuetype = "[SEND] Bug Prod"`.
-- Le issue senza `resolutiondate` sono escluse dal calcolo e riportate in `skippedIssues`.
+- `resolutionDate` usa `fields.resolutiondate` quando presente; se mancante, viene estratta dal `changelog` come timestamp dell'ultima transizione di stato a `Completata`.
+- Le issue senza `resolutionDate` anche dopo il fallback da changelog sono escluse dal calcolo e riportate in `skippedIssues`.
 - Se non ci sono issue risolte nel periodo, `mttrHours = null`.
 - Percentili `p50Hours` e `p90Hours` calcolati sulle sole issue risolte.
 
@@ -136,6 +137,7 @@ L'endpoint REST `/api/dora/mean-time-to-restore` calcola il tempo medio di ripri
 - `fields.summary`
 - `fields.created`
 - `fields.resolutiondate`
+- `changelog.histories[].{created,items}` (fallback su stato `Completata`)
 - `fields.issuetype`
 - `fields.status`
 

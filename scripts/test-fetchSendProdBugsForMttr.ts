@@ -22,6 +22,7 @@ async function main() {
     const issues = await fetchSendProdBugsForMttr(userId, projectKey, team, from, to);
 
     console.log(`\nDone. SEND prod bugs found: ${issues.length}`);
+    console.log(`\Issues: ${JSON.stringify(issues, null, 2)}`);
 
     const wrongType = issues.filter((issue: any) => issue.issueType !== '[SEND] Bug Prod');
     if (wrongType.length > 0) {

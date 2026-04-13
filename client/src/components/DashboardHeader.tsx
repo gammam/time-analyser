@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, BarChart3, ListTodo, Settings, MessageSquare } from "lucide-react";
+import { LogOut, BarChart3, ListTodo, Settings, MessageSquare, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Link, useLocation } from "wouter";
@@ -28,9 +28,10 @@ interface DashboardHeaderProps {
   onDateRangeChange?: (range: string) => void;
   dateRange?: string;
   hasJiraCredentials?: boolean;
+  showDateRange?: boolean;
 }
 
-export function DashboardHeader({ onDateRangeChange, dateRange = "today", hasJiraCredentials = false }: DashboardHeaderProps) {
+export function DashboardHeader({ onDateRangeChange, dateRange = "today", hasJiraCredentials = false, showDateRange = true }: DashboardHeaderProps) {
   const { user } = useAuth();
   const typedUser = user as User | undefined;
   const [location] = useLocation();
@@ -72,21 +73,34 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today", hasJir
                   </Button>
                 </Link>
               )}
+              <Link href="/dora">
+                <Button
+                  variant={location === "/dora" ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid="nav-dora"
+                >
+                  <Gauge className="h-4 w-4" />
+                  DORA
+                </Button>
+              </Link>
             </nav>
           </div>
           
           <div className="flex items-center gap-2">
-            <Select value={dateRange} onValueChange={onDateRangeChange}>
-              <SelectTrigger className="w-[140px]" data-testid="select-date-range">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="7days">Last 7 Days</SelectItem>
-                <SelectItem value="30days">Last 30 Days</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
+            {showDateRange && (
+              <Select value={dateRange} onValueChange={onDateRangeChange}>
+                <SelectTrigger className="w-[140px]" data-testid="select-date-range">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="7days">Last 7 Days</SelectItem>
+                  <SelectItem value="30days">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
             <Button 
               variant="outline" 

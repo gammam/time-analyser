@@ -13,6 +13,7 @@ interface SettingsResponse extends Omit<UserSettings, 'googleAccessToken' | 'goo
   hasJiraCredentials: boolean;
 }
 import Dashboard from "@/pages/Dashboard";
+import DoraDashboard from "@/pages/DoraDashboard";
 import TaskAnalysis from "@/pages/TaskAnalysis";
 import Settings from "@/pages/Settings";
 import Landing from "@/pages/Landing";
@@ -64,6 +65,7 @@ function Router() {
             ) : (
               <>
                 <Route path="/" component={Dashboard} />
+                <Route path="/dora" component={DoraDashboard} />
                 <Route path="/tasks" component={TaskAnalysis} />
                 <Route path="/settings" component={Settings} />
               </>

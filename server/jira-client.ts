@@ -1,3 +1,97 @@
+// Extracts worklog data from SEND Analysis Tickets linked to Epics (Cost Analyze Story 1.1)
+/**
+ * Fetch SEND Analysis Ticket worklogs for a set of Epics in a given time range.
+ * @param {Object} params
+ * @param {string} params.userId - The user ID for Jira credentials
+ * @param {Array<{id: string, key: string, name: string}>} params.epics - List of Epics to process
+ * @param {{from: string, to: string}} params.timeRange - Time range for filtering tickets
+ * @returns {Promise<Array<{epicId: string, epicName: string, worklogs: Array<{user: string, hours: number}>}>>}
+ */
+/**
+ * Fetch SEND Analysis Ticket worklogs for all Epics in a project and time range.
+ * @param {Object} params
+ * @param {string} params.userId - The user ID for Jira credentials
+ * @param {string} params.projectKey - The Jira project key
+ * @param {{from: string, to: string}} params.timeRange - Time range for filtering epics and tickets
+ * @returns {Promise<Array<{epicId: string, epicName: string, worklogs: Array<{user: string, hours: number}>}>>}
+ */
+export async function fetchSendAnalysisWorklogs({ userId, projectKey, timeRange }) {
+  // Step 1: Fetch all Epics in the project and time range
+  const epics = await fetchEpicsWithChangelog(userId, projectKey, undefined, timeRange.from, timeRange.to);
+  const { email, apiToken, host } = await getUserJiraCredentials(userId);
+  const normalizedHost = host.endsWith('/') ? host.slice(0, -1) : host;
+  const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+  const results = [];
+
+  for (const epic of epics) {
+    // Query SEND Analysis Tickets linked to this Epic
+    const jql = [
+      `parent = ${epic.key}`,
+      `issuetype = "[SEND] Analysis"`,
+      timeRange.from ? `created >= "${timeRange.from}"` : null,
+      timeRange.to ? `created <= "${timeRange.to}"` : null,
+    ].filter(Boolean).join(' AND ');
+
+    const url = `${normalizedHost}/rest/api/3/search/jql`;
+    let sendTickets = [];
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jql,
+          maxResults: 100,
+          fields: ['summary', 'worklog', 'assignee'],
+          expand: 'worklog',
+          fieldsByKeys: false,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Jira query failed for Epic ${epic.key}: ${response.status}`);
+      }
+      const data = await response.json();
+      sendTickets = data.issues || [];
+    } catch (err) {
+      console.error(`[JIRA] Error fetching SEND Analysis Tickets for Epic ${epic.key}:`, err);
+      sendTickets = [];
+    }
+
+    // Extract worklog data
+    const worklogs = [];
+    for (const ticket of sendTickets) {
+      // Standard Jira worklogs
+      const logs = (ticket.fields?.worklog?.worklogs || []).map(wl => ({
+        user: wl.author?.displayName || wl.author?.name || wl.author?.emailAddress || 'unknown',
+        hours: wl.timeSpentSeconds ? wl.timeSpentSeconds / 3600 : 0,
+      }));
+      worklogs.push(...logs);
+      // Optionally, extract custom time fields if present (e.g., ticket.fields.customfield_XXX)
+      // Uncomment and adjust if needed:
+      // if (ticket.fields?.customfield_XXX) {
+      //   worklogs.push({ user: ticket.fields.assignee?.displayName || 'unknown', hours: ticket.fields.customfield_XXX });
+      // }
+    }
+
+    // Aggregate by user
+    const userHours = {};
+    for (const wl of worklogs) {
+      if (!wl.user) continue;
+      userHours[wl.user] = (userHours[wl.user] || 0) + wl.hours;
+    }
+    const aggregated = Object.entries(userHours).map(([user, hours]) => ({ user, hours }));
+
+    results.push({
+      epicId: epic.key,
+      epicName: epic.fields?.summary || epic.name || epic.key,
+      worklogs: aggregated,
+    });
+  }
+  return results;
+}
 // Recupera tutte le epiche di un progetto/team con changelog (per READY_FOR_UAT)
 import { deriveResolutionDateFromChangelog } from './mttr-resolution-date.ts';
 

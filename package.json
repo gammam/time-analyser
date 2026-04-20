@@ -12,7 +12,8 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "test:jira:prod-bugs": "tsx scripts/test-fetchProductionBugsForReleases.ts",
-    "test:jira:mttr": "tsx scripts/test-fetchSendProdBugsForMttr.ts"
+    "test:jira:mttr": "tsx scripts/test-fetchSendProdBugsForMttr.ts",
+    "test:jira:cost-analyze": "tsx scripts/test-fetchSendAnalysisWorklogs.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -13,6 +13,7 @@ import { encryptJiraToken, decryptJiraToken } from "./jira-crypto";
 import { createChangeFailureRateHandler } from "./change-failure-rate-handler";
 import { createLeadTimeEpicHandler } from "./lead-time-epic-handler";
 import { createMeanTimeToRestoreHandler } from "./mean-time-to-restore-handler";
+import { createCostAnalyzeHandler } from "./cost-analyze-handler";
 import { stringify } from "querystring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -879,6 +880,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
   app.get('/api/dora/mean-time-to-restore', isAuthenticated, meanTimeToRestoreHandler);
+
+  // Cost Analyze: Time spent per Epic and team member
+  const costAnalyzeHandler = createCostAnalyzeHandler({
+    fetchSendAnalysisWorklogs: async (params) => {
+      const { fetchSendAnalysisWorklogs } = await import('./jira-client');
+      return fetchSendAnalysisWorklogs(params);
+    },
+  });
+  app.get('/api/cost-analyze', isAuthenticated, costAnalyzeHandler);
 
   // JIRA credentials - Save (POST)
   app.post('/api/jira/credentials', isAuthenticated, async (req: any, res: any) => {

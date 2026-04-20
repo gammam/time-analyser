@@ -1,8 +1,8 @@
 ---
 title: Story 1.2 - Aggregate and Display Hours per Epic and Member
 created: 2026-04-20
-last_updated: 2026-04-20
-status: ready-for-dev
+last_updated: 2026-04-21
+status: complete
 sourceEpic: Cost Analyze Reporting
 sourceStory: 1.2
 inputDocuments:
@@ -48,7 +48,7 @@ So that I can understand resource allocation and project costs.
 
 ### Backend
 
-- [ ] **1. Create handler `server/cost-analyze-handler.ts`**
+- [x] **1. Create handler `server/cost-analyze-handler.ts`**
   - Accepts `req.query`: `{ projectKey: string, from?: string, to?: string }`
   - Validates `projectKey` is present (400 if missing).
   - Validates `from`/`to` are valid ISO dates (400 if malformed).
@@ -57,10 +57,10 @@ So that I can understand resource allocation and project costs.
   - Propagates Jira auth errors as 401, other errors as 500.
   - Follow the same dependency-injection pattern as `createLeadTimeEpicHandler`.
 
-- [ ] **2. Register route in `server/index.ts`**
+- [x] **2. Register route in `server/index.ts`**
   - `GET /api/cost-analyze` — authenticated, uses the new handler.
 
-- [ ] **3. Write handler unit tests `server/cost-analyze-handler.test.ts`**
+- [x] **3. Write handler unit tests `server/cost-analyze-handler.test.ts`**
   - 400 when `projectKey` is missing.
   - 400 for invalid `from`/`to` date formats.
   - 200 with correct aggregated shape for valid input.
@@ -69,12 +69,12 @@ So that I can understand resource allocation and project costs.
 
 ### Frontend
 
-- [ ] **4. Create API helper `client/src/lib/cost-analyze.ts`**
+- [x] **4. Create API helper `client/src/lib/cost-analyze.ts`**
   - Typed request context: `{ projectKey: string, from: string, to: string }`.
   - Typed response: `CostAnalyzeReport = { epics: EpicCost[] }` and `EpicCost = { epicId, epicName, totalHours, worklogs: WorklogEntry[] }`.
   - `fetchCostAnalyzeReport(request): Promise<CostAnalyzeReport>` — calls `GET /api/cost-analyze`.
 
-- [ ] **5. Create page `client/src/pages/CostAnalyze.tsx`**
+- [x] **5. Create page `client/src/pages/CostAnalyze.tsx`**
   - Shared filter bar: `projectKey` input (default `PN`), `from` date, `to` date, `Generate Report` button.
   - Date range validation: `from > to` → show inline error, block fetch.
   - On submit: call `fetchCostAnalyzeReport` via TanStack Query (use `queryClient` from `client/src/lib/queryClient.ts`).
@@ -84,11 +84,11 @@ So that I can understand resource allocation and project costs.
   - States: loading skeleton, empty state (no epics found), error state (readable message).
   - Responsive layout following existing shadcn/ui + Tailwind patterns.
 
-- [ ] **6. Register route and navigation**
+- [x] **6. Register route and navigation**
   - Add `/cost-analyze` route in `client/src/App.tsx` (authenticated guard, same as `/dora`).
   - Add "Time" nav item pointing to `/cost-analyze` in `client/src/components/DashboardHeader.tsx`.
 
-- [ ] **7. Write frontend tests `client/src/lib/cost-analyze.test.ts`**
+- [x] **7. Write frontend tests `client/src/lib/cost-analyze.test.ts`**
   - Query builder produces correct URL params.
   - Successful response maps to typed shape.
   - Partial failure (non-ok response) throws a readable error.

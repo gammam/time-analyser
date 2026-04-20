@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, BarChart3, ListTodo, Settings, MessageSquare, Gauge } from "lucide-react";
+import { LogOut, BarChart3, ListTodo, Settings, MessageSquare, Gauge, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Link, useLocation } from "wouter";
@@ -82,6 +82,17 @@ export function DashboardHeader({ onDateRangeChange, dateRange = "today", hasJir
                 >
                   <Gauge className="h-4 w-4" />
                   DORA
+                </Button>
+              </Link>
+              <Link href="/cost-analyze">
+                <Button
+                  variant={location === "/cost-analyze" ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                  data-testid="nav-cost-analyze"
+                >
+                  <Clock className="h-4 w-4" />
+                  Time
                 </Button>
               </Link>
             </nav>
